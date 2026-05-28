@@ -150,3 +150,12 @@ export interface AppNotification {
   type: 'info' | 'warning' | 'success' | 'error';
   isRead: boolean;
 }
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  key: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}

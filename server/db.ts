@@ -13,7 +13,7 @@ import {
 } from '../src/mockData';
 import { 
   User, Category, Product, Supplier, Customer, Warehouse, 
-  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog 
+  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey 
 } from '../src/types';
 
 const DB_FILE = path.join(process.cwd(), 'db.json');
@@ -32,6 +32,7 @@ export interface DatabaseSchema {
   stocktakes: Stocktake[];
   mutations: StockMove[];
   logs: AuditLog[];
+  apiKeys: ApiKey[];
 }
 
 let dbState: DatabaseSchema = {
@@ -47,7 +48,8 @@ let dbState: DatabaseSchema = {
   exports: [],
   stocktakes: [],
   mutations: [],
-  logs: []
+  logs: [],
+  apiKeys: []
 };
 
 // Simple helper to hash strings using node:crypto (equivalent to bcrypt simulation)
@@ -60,6 +62,9 @@ export function initDatabase() {
     try {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       dbState = JSON.parse(data);
+      if (!dbState.apiKeys) {
+        dbState.apiKeys = [];
+      }
       console.log('Database loaded successfully from file:', DB_FILE);
     } catch (e) {
       console.error('Error reading db.json, re-initializing database:', e);
@@ -85,6 +90,7 @@ function seedDatabase() {
     exports: [...INITIAL_EXPORTS],
     stocktakes: [...INITIAL_STOCKTAKES],
     mutations: [...INITIAL_MUTATIONS],
+    apiKeys: [],
     logs: [
       {
         id: 'log-1',

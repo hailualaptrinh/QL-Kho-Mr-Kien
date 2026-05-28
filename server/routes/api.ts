@@ -4,10 +4,11 @@
  */
 
 import { Router, Response } from 'express';
+import crypto from 'crypto';
 import { getDb, saveDatabase, logActivity, addNotification } from '../db';
 import { authMiddleware, roleMiddleware, AuthenticatedRequest } from '../middleware/auth';
 import { signJWT } from '../../src/utils';
-import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove } from '../../src/types';
+import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey } from '../../src/types';
 
 const router = Router();
 
@@ -780,6 +781,85 @@ router.put('/notifications/mark-all', authMiddleware, (req, res) => {
 // Logs fetch for audit trails
 router.get('/logs', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
   res.json(getDb().logs);
+});
+
+// ==========================================
+// 11. API KEYS MANAGEMENT
+// ==========================================
+router.get('/apikeys', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+  res.json(getDb().apiKeys || []);
+});
+
+router.post('/apikeys', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    res.status(400).json({ error: 'Vui lòng cung cấp tên gợi nhớ cho API Key.' });
+    return;
+  }
+
+  const db = getDb();
+  if (!db.apiKeys) {
+    db.apiKeys = [];
+  }
+
+  const randomHex = crypto.randomBytes(16).toString('hex');
+  const apiKeyStr = `mrkien_api_${randomHex}`;
+
+  const newKey: ApiKey = {
+    id: `key-${Date.now()}`,
+    name: name.trim(),
+    key: apiKeyStr,
+    createdAt: new Date().toISOString(),
+    status: 'ACTIVE'
+  };
+
+  db.apiKeys.unshift(newKey);
+  saveDatabase();
+
+  logActivity(req.userId || 'admin', 'THIẾT LẬP API', `Đã khởi tạo API Key kết nối mới: "${name.trim()}"`);
+
+  res.status(201).json(newKey);
+});
+
+router.post('/apikeys/:id/toggle', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  if (!db.apiKeys) db.apiKeys = [];
+
+  const foundKey = db.apiKeys.find(k => k.id === id);
+  if (!foundKey) {
+    res.status(404).json({ error: 'Không tìm thấy API Key yêu cầu.' });
+    return;
+  }
+
+  foundKey.status = foundKey.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+  saveDatabase();
+
+  logActivity(
+    req.userId || 'admin', 
+    'THIẾT LẬP API', 
+    `Đã thay đổi trạng thái API Key "${foundKey.name}" sang [${foundKey.status}]`
+  );
+
+  res.json(foundKey);
+});
+
+router.delete('/apikeys/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  if (!db.apiKeys) db.apiKeys = [];
+
+  const initialLength = db.apiKeys.length;
+  const targetKey = db.apiKeys.find(k => k.id === id);
+  db.apiKeys = db.apiKeys.filter(k => k.id !== id);
+
+  if (db.apiKeys.length < initialLength) {
+    saveDatabase();
+    logActivity(req.userId || 'admin', 'THIẾT LẬP API', `Đã xoá/thu hồi API Key: "${targetKey?.name || id}"`);
+    res.json({ success: true, message: 'Thu hồi API Key thành công.' });
+  } else {
+    res.status(404).json({ error: 'Không tìm thấy API Key yêu cầu.' });
+  }
 });
 
 export default router;

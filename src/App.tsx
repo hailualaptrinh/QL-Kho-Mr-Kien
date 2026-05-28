@@ -20,6 +20,7 @@ import Warehouses from './components/Warehouses';
 import Customers from './components/Customers';
 import Employees from './components/Employees';
 import Reports from './components/Reports';
+import ApiKeysComponent from './components/ApiKeysComponent';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('mrkien_erp_token'));
@@ -489,6 +490,15 @@ export default function App() {
               {isSidebarOpen && <span>Báo Cáo Tài Chính</span>}
             </button>
 
+            <button
+              id="sidebar-nav-apikeys"
+              onClick={() => setActiveTab('apikeys')}
+              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'apikeys' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+            >
+              <Key className="h-4.5 w-4.5 text-amber-500" />
+              {isSidebarOpen && <span>Cổng Kết Nối & API Key</span>}
+            </button>
+
           </nav>
         </div>
 
@@ -695,6 +705,13 @@ export default function App() {
               suppliers={suppliers}
               customers={customers}
               user={user}
+            />
+          )}
+
+          {activeTab === 'apikeys' && (
+            <ApiKeysComponent
+              user={user}
+              onRefresh={fetchAllStates}
             />
           )}
         </main>

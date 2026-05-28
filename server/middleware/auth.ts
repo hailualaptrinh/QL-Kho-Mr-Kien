@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { decodeJWT } from '../../src/utils';
+import { getDb, saveDatabase } from '../db';
 
 // Extend Express Request type declarations
 export interface AuthenticatedRequest extends Request {
@@ -14,6 +15,26 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  // 1. Check if custom API key is supplied via header or query
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey || req.query.apikey;
+  if (apiKey && typeof apiKey === 'string') {
+    const db = getDb();
+    const foundKey = db.apiKeys?.find(k => k.key === apiKey && k.status === 'ACTIVE');
+    if (foundKey) {
+      // Setup mock authenticated context
+      req.userId = 'api-key-caller';
+      req.userRole = 'ADMIN'; // API Keys are granted Admin permissions
+      req.username = `api:${foundKey.name}`;
+
+      // Update last active audit state
+      foundKey.lastUsedAt = new Date().toISOString();
+      saveDatabase();
+
+      next();
+      return;
+    }
+  }
+
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
