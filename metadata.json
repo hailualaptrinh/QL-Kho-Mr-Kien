@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý kho Mr Kiên",
+  "description": "Hệ thống ERP quản lý kho chuyên nghiệp, tích hợp phân quyền Quản trị (Admin) và Nhân viên (Client), thống kê doanh thu, kiểm kho, xuất báo cáo PDF/Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
