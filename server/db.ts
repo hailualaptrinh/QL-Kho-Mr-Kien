@@ -16,7 +16,26 @@ import {
   ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey 
 } from '../src/types';
 
-const DB_FILE = path.join(process.cwd(), 'db.json');
+// Support custom environment paths or Render's persistent disk mounts dynamically
+const getDbFilePath = (): string => {
+  if (process.env.DB_FILE_PATH) {
+    return process.env.DB_FILE_PATH;
+  }
+  
+  // Standard fallback for Render persistent disks mounted at /data
+  if (fs.existsSync('/data')) {
+    try {
+      fs.accessSync('/data', fs.constants.W_OK);
+      return '/data/db.json';
+    } catch (e) {
+      console.warn('Directory /data exists but is not writable, using local working directory instead.');
+    }
+  }
+  
+  return path.join(process.cwd(), 'db.json');
+};
+
+const DB_FILE = getDbFilePath();
 
 export interface DatabaseSchema {
   users: User[];
