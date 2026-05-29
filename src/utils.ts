@@ -70,24 +70,36 @@ export function formatDate(isoString: string, includeTime: boolean = true): stri
   return `${hours}:${minutes} - ${day}/${month}/${year}`;
 }
 
-// Simulate client-side Excel download via CSV format (UTF-8 BOM to survive Excel import)
+// Simulate client-side Excel download via TSV/CSV format with UTF-16LE BOM
 export function exportToCSV(filename: string, headers: string[], data: any[][]) {
-  let csvContent = '\uFEFFsep=,\r\n'; // Add BOM and explicitly declare separator for Microsoft Excel compatibility
+  // Format cells: replace quotes and sanitize newlines
+  const formatCell = (cell: any) => {
+    const formatted = cell === null || cell === undefined ? '' : String(cell);
+    const escaped = formatted.replace(/"/g, '""');
+    // Wrap in double quotes if it contains tabs, newlines, or double quotes
+    if (escaped.includes('\t') || escaped.includes('\n') || escaped.includes('\r') || escaped.includes('"')) {
+      return `"${escaped}"`;
+    }
+    return escaped;
+  };
 
-  
-  // Headers row
-  csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\r\n';
-  
-  // Data rows
-  data.forEach(row => {
-    const rowContent = row.map(cell => {
-      const formatted = cell === null || cell === undefined ? '' : String(cell);
-      return `"${formatted.replace(/"/g, '""')}"`;
-    }).join(',');
-    csvContent += rowContent + '\r\n';
-  });
+  const headerRow = headers.map(formatCell).join('\t');
+  const dataRows = data.map(row => row.map(formatCell).join('\t'));
+  const fullContent = [headerRow, ...dataRows].join('\r\n');
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Convert string to UTF-16LE ArrayBuffer
+  const buffer = new ArrayBuffer((fullContent.length + 1) * 2);
+  const view = new DataView(buffer);
+  
+  // Set UTF-16LE Byte Order Mark (0xFEFF)
+  view.setUint16(0, 0xFEFF, true);
+  
+  // Write all characters
+  for (let i = 0; i < fullContent.length; i++) {
+    view.setUint16((i + 1) * 2, fullContent.charCodeAt(i), true);
+  }
+
+  const blob = new Blob([buffer], { type: 'text/csv;charset=utf-16le;' });
   const url = URL.createObjectURL(blob);
   
   const link = document.createElement('a');
