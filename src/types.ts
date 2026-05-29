@@ -14,6 +14,11 @@ export interface User {
   avatar?: string;
   role: Role;
   status: 'ACTIVE' | 'INACTIVE';
+  permissions?: {
+    canAdd: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+  };
 }
 
 export interface Category {

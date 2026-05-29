@@ -6,7 +6,7 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { getDb, saveDatabase, logActivity, addNotification } from '../db';
-import { authMiddleware, roleMiddleware, AuthenticatedRequest } from '../middleware/auth';
+import { authMiddleware, roleMiddleware, checkPermission, AuthenticatedRequest } from '../middleware/auth';
 import { signJWT } from '../../src/utils';
 import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey } from '../../src/types';
 
@@ -116,7 +116,7 @@ router.get('/products', (req, res) => {
   res.json(getDb().products);
 });
 
-router.post('/products', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/products', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
   const productData: Partial<Product> = req.body;
   const db = getDb();
 
@@ -160,7 +160,7 @@ router.post('/products', authMiddleware, roleMiddleware(['ADMIN']), (req: Authen
   res.status(201).json(newProduct);
 });
 
-router.put('/products/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.put('/products/:id', authMiddleware, checkPermission('EDIT'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const updateData = req.body;
   const db = getDb();
@@ -197,7 +197,7 @@ router.put('/products/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: Aut
   res.json(updatedProduct);
 });
 
-router.delete('/products/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.delete('/products/:id', authMiddleware, checkPermission('DELETE'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const db = getDb();
 
@@ -219,7 +219,7 @@ router.get('/categories', (req, res) => {
   res.json(getDb().categories);
 });
 
-router.post('/categories', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+router.post('/categories', authMiddleware, checkPermission('ADD'), (req, res) => {
   const { name, description } = req.body;
   if (!name) {
     res.status(400).json({ error: 'Vên danh mục không thể trống.' });
@@ -457,7 +457,7 @@ router.get('/warehouses', (req, res) => {
   res.json(getDb().warehouses);
 });
 
-router.post('/warehouses', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
   const { name, location, managerId } = req.body;
   if (!name || !location) {
     res.status(400).json({ error: 'Nhập tên kho và địa chỉ giao hợp lệ.' });
@@ -481,7 +481,7 @@ router.get('/mutations', authMiddleware, (req, res) => {
   res.json(getDb().mutations);
 });
 
-router.post('/warehouses/transfer', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses/transfer', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
   const { fromWarehouseId, toWarehouseId, productId, quantity, notes } = req.body;
   const db = getDb();
 
@@ -526,7 +526,7 @@ router.get('/stocktakes', authMiddleware, (req, res) => {
   res.json(getDb().stocktakes);
 });
 
-router.post('/warehouses/stocktake', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses/stocktake', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
   const { warehouseId, items, notes } = req.body;
   const db = getDb();
 
@@ -609,7 +609,7 @@ router.post('/customers', authMiddleware, (req, res) => {
 });
 
 router.get('/suppliers', (req, res) => res.json(getDb().suppliers));
-router.post('/suppliers', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+router.post('/suppliers', authMiddleware, checkPermission('ADD'), (req, res) => {
   const sup: Partial<Supplier> = req.body;
   if (!sup.name) {
     res.status(400).json({ error: 'Tên nhà cung cấp không thể trống.' });
@@ -675,6 +675,63 @@ router.put('/employees/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: Au
   db.employees[index] = updated;
   saveDatabase();
   res.json(updated);
+});
+
+// ==========================================
+// 8.5. USER ACCOUNTS & PERMISSIONS MANAGEMENT
+// ==========================================
+router.get('/users', authMiddleware, (req, res) => {
+  const db = getDb();
+  // Ensure we don't return passwords if any exist
+  const safeUsers = db.users.map((userObj) => {
+    const u = { ...userObj } as any;
+    if (!u.permissions) {
+      u.permissions = { canAdd: false, canEdit: false, canDelete: false };
+    }
+    return u;
+  });
+  res.json(safeUsers);
+});
+
+router.put('/users/:id/permissions', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const { permissions, status, role } = req.body;
+  const db = getDb();
+
+  const userIndex = db.users.findIndex(u => u.id === id);
+  if (userIndex === -1) {
+    res.status(404).json({ error: 'Không tìm thấy tài khoản người dùng.' });
+    return;
+  }
+
+  const updatedUser = {
+    ...db.users[userIndex],
+  } as any;
+
+  if (permissions !== undefined) {
+    updatedUser.permissions = {
+      canAdd: !!permissions.canAdd,
+      canEdit: !!permissions.canEdit,
+      canDelete: !!permissions.canDelete
+    };
+  }
+  
+  if (status !== undefined) {
+    updatedUser.status = status;
+  }
+
+  if (role !== undefined) {
+    // Only allow ADMIN or CLIENT
+    if (role === 'ADMIN' || role === 'CLIENT') {
+      updatedUser.role = role;
+    }
+  }
+
+  db.users[userIndex] = updatedUser;
+  logActivity(req.userId || 'system', 'PHÂN QUYỀN', `Cập nhật quyền hạn cho tài khoản "${updatedUser.fullName}".`);
+  saveDatabase();
+
+  res.json(updatedUser);
 });
 
 // ==========================================

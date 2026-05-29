@@ -34,12 +34,8 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(localStorage.getItem('mrkien_dark_mode') === 'true');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  // Static Offline Mode Detection for Serverless Platforms like GitHub Pages
-  const [isStaticMode, setIsStaticMode] = useState<boolean>(() => {
-    const forced = localStorage.getItem('mrkien_static_mode');
-    if (forced !== null) return forced === 'true';
-    return window.location.hostname.includes('github.io');
-  });
+  // Static Offline Mode is permanently disabled per user request
+  const isStaticMode = false;
 
   const getLocalDB = (key: string, defaultValue: any) => {
     const val = localStorage.getItem(`mrkien_db_${key}`);
@@ -313,6 +309,7 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<any[]>([]);
   const [imports, setImports] = useState<any[]>([]);
   const [exports, setExports] = useState<any[]>([]);
   const [mutations, setMutations] = useState<any[]>([]);
@@ -422,7 +419,7 @@ export default function App() {
       // Parallelize fetches to keep responses extremely snappy
       const [
         statsRes, prodRes, catRes, supRes, cusRes, 
-        empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes
+        empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes, usersRes
       ] = await Promise.all([
         fetch('/api/reports/dashboard-stats', { headers }).then(r => r.json()),
         fetch('/api/products', { headers }).then(r => r.json()),
@@ -436,7 +433,8 @@ export default function App() {
         fetch('/api/stocktakes', { headers }).then(r => r.json()),
         fetch('/api/logs', { headers }).then(r => r.json()),
         fetch('/api/notifications', { headers }).then(r => r.json()),
-        fetch('/api/warehouses', { headers }).then(r => r.json())
+        fetch('/api/warehouses', { headers }).then(r => r.json()),
+        fetch('/api/users', { headers }).then(r => r.json())
       ]);
 
       setStats(statsRes);
@@ -452,6 +450,7 @@ export default function App() {
       setLogs(logRes || []);
       setNotifications(notifRes || []);
       setWarehouses(whRes || []);
+      setUsersList(Array.isArray(usersRes) ? usersRes : []);
 
     } catch (e) {
       console.error('Failed to sync ERP parameters:', e);
@@ -626,6 +625,7 @@ export default function App() {
 
   const handleAddEmployee = (payload: any) => makePostCall('/api/employees', payload);
   const handleUpdateEmployee = (id: string, payload: any) => makePutCall(`/api/employees/${id}`, payload);
+  const handleUpdateUserPermissions = (id: string, payload: any) => makePutCall(`/api/users/${id}/permissions`, payload);
 
   const handleMarkNotificationsRead = async () => {
     try {
@@ -672,27 +672,11 @@ export default function App() {
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             {loginError && (
-              <div className="p-3 bg-red-500/10 border border-red-540/20 text-red-400 text-xs rounded-xl font-bold space-y-2">
+              <div className="p-3 bg-red-500/10 border border-red-540/20 text-red-400 text-xs rounded-xl font-bold">
                 <div className="flex items-center gap-2">
                   <AlertOctagon className="h-4 w-4 shrink-0" />
                   <span>{loginError}</span>
                 </div>
-                {loginError.includes('Không thể kết nối') && (
-                  <div className="pt-2 border-t border-red-500/10 text-[10.5px] font-normal leading-relaxed text-slate-300">
-                    Phát hiện máy chủ API Node.js không khả dụng (phổ biến khi chạy trên môi trường tĩnh như GitHub Pages). Hãy nhấp nút bên dưới để chuyển sang <strong>Chế độ Ngoại tuyến (Static Storage)</strong> để có thể đăng nhập & trải nghiệm toàn bộ tính năng 100%:
-                    <button
-                      type="button" 
-                      onClick={() => {
-                        setIsStaticMode(true);
-                        localStorage.setItem('mrkien_static_mode', 'true');
-                        setLoginError('');
-                      }}
-                      className="w-full mt-2 cursor-pointer p-2 text-xs font-bold text-center border border-amber-500/30 hover:border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 hover:text-white rounded-lg transition-colors"
-                    >
-                      ⚡ Chuyển sang Chế độ Ngoại tuyến (Static Demo)
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
@@ -939,23 +923,10 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const toggledState = !isStaticMode;
-                  setIsStaticMode(toggledState);
-                  localStorage.setItem('mrkien_static_mode', toggledState ? 'true' : 'false');
-                  setTimeout(() => window.location.reload(), 150);
-                }}
-                className={`text-[10px] sm:text-xs font-bold px-2.5 sm:px-3.5 py-1.5 rounded-full cursor-pointer transition-all flex items-center gap-1.5 ${
-                  isStaticMode 
-                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25' 
-                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
-                }`}
-                title="Bấm để chuyển đổi giữa kết nối Live API và Chế độ Lưu trữ Ngoại tuyến"
-              >
-                <Activity className={`h-3 w-3 ${isStaticMode ? 'animate-pulse text-amber-500' : 'text-emerald-500'}`} />
-                <span>Ngoại tuyến: {isStaticMode ? 'ĐANG BẬT (Demo)' : 'TẮT (Live API)'}</span>
-              </button>
+              <span className="text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 select-none" title="Kết nối máy chủ cơ sở dữ liệu cloud ổn định">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Máy chủ: LIÊN KẾT CLOUD (Render Live)</span>
+              </span>
             </div>
           </div>
 
@@ -1099,6 +1070,8 @@ export default function App() {
               user={user}
               onAddEmployee={handleAddEmployee}
               onUpdateEmployee={handleUpdateEmployee}
+              usersList={usersList}
+              onUpdateUserPermissions={handleUpdateUserPermissions}
               onRefresh={fetchAllStates}
             />
           )}

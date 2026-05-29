@@ -67,3 +67,45 @@ export function roleMiddleware(allowedRoles: ('ADMIN' | 'CLIENT')[]) {
     next();
   };
 }
+
+export function checkPermission(action: 'ADD' | 'EDIT' | 'DELETE') {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.userId) {
+      res.status(401).json({ error: 'Xác thực không hợp lệ.' });
+      return;
+    }
+    
+    // Admin always has all privileges
+    if (req.userRole === 'ADMIN') {
+      next();
+      return;
+    }
+
+    const db = getDb();
+    const user = db.users.find(u => u.id === req.userId);
+    if (!user) {
+      res.status(403).json({ error: 'Không tìm thấy thông tin tài khoản người dùng.' });
+      return;
+    }
+
+    // Default permissions setup if none exists
+    const perms = (user as any).permissions || { canAdd: false, canEdit: false, canDelete: false };
+
+    if (action === 'ADD' && perms.canAdd) {
+      next();
+      return;
+    }
+    if (action === 'EDIT' && perms.canEdit) {
+      next();
+      return;
+    }
+    if (action === 'DELETE' && perms.canDelete) {
+      next();
+      return;
+    }
+
+    res.status(403).json({ 
+      error: `Bạn không có quyền ${action === 'ADD' ? 'THÊM MỚI' : action === 'EDIT' ? 'SỬA ĐỔI' : 'XÓA BỎ'} dữ liệu. Liên hệ Quản trị viên để cấp quyền.` 
+    });
+  };
+}
