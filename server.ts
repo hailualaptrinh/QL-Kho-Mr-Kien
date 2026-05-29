@@ -17,7 +17,7 @@ async function startServer() {
   const PORT = 3000;
 
   // Boot the local disk storage databases
-  initDatabase();
+  await initDatabase();
 
   // Middleware for robust body request decoding
   app.use(express.json({ limit: '10mb' }));

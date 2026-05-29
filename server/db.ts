@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { MongoClient } from 'mongodb';
 import { 
   INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SUPPLIERS, 
   INITIAL_CUSTOMERS, INITIAL_WAREHOUSES, INITIAL_EMPLOYEES, INITIAL_NOTIFICATIONS, 
@@ -76,7 +77,64 @@ export function hashPassword(password: string): string {
   return crypto.createHmac('sha256', 'mrkien-salt-999').update(password).digest('hex');
 }
 
-export function initDatabase() {
+// MongoDB Client State Management
+let mongoClient: MongoClient | null = null;
+let saveTimeout: NodeJS.Timeout | null = null;
+
+async function connectToMongo(): Promise<MongoClient | null> {
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (!uri) return null;
+  if (mongoClient) return mongoClient;
+  
+  try {
+    console.log('Connecting to MongoDB Atlas cloud database...');
+    const client = new MongoClient(uri, {
+      connectTimeoutMS: 8000,
+      socketTimeoutMS: 30000,
+    });
+    await client.connect();
+    mongoClient = client;
+    console.log('Successfully connected to MongoDB Atlas on cloud!');
+    return mongoClient;
+  } catch (err) {
+    console.error('Failed to connect to MongoDB Atlas:', err);
+    return null;
+  }
+}
+
+export async function initDatabase() {
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (uri) {
+    try {
+      const client = await connectToMongo();
+      if (client) {
+        // Extract database name from connection string or fallback to "mrkien_erp"
+        const dbName = uri.split('/').pop()?.split('?')[0] || 'mrkien_erp';
+        const db = client.db(dbName);
+        const col = db.collection<any>('system_state');
+        const doc = await col.findOne({ _id: 'main' });
+        
+        if (doc) {
+          const { _id, ...rest } = doc;
+          dbState = { ...dbState, ...rest };
+          console.log('====== MONGO DB CONFIG ======');
+          console.log('👉 Loaded system database state from MongoDB Atlas cloud!');
+          console.log('==============================');
+          return;
+        } else {
+          console.log('No existing state found in MongoDB. Initializing initial database seeding...');
+          seedDatabaseInternal();
+          await col.updateOne({ _id: 'main' }, { $set: dbState }, { upsert: true });
+          console.log('Successfully seeded database state directly to MongoDB Atlas cloud!');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to read from MongoDB Atlas. Falling back to local file path:', err);
+    }
+  }
+
+  // File fallback
   if (fs.existsSync(DB_FILE)) {
     try {
       const data = fs.readFileSync(DB_FILE, 'utf8');
@@ -84,7 +142,7 @@ export function initDatabase() {
       if (!dbState.apiKeys) {
         dbState.apiKeys = [];
       }
-      console.log('Database loaded successfully from file:', DB_FILE);
+      console.log('Database loaded successfully from local file:', DB_FILE);
     } catch (e) {
       console.error('Error reading db.json, re-initializing database:', e);
       seedDatabase();
@@ -94,8 +152,7 @@ export function initDatabase() {
   }
 }
 
-function seedDatabase() {
-  console.log('Seeding initial database...');
+function seedDatabaseInternal() {
   dbState = {
     users: [...INITIAL_USERS],
     categories: [...INITIAL_CATEGORIES],
@@ -120,14 +177,55 @@ function seedDatabase() {
       }
     ]
   };
+}
+
+function seedDatabase() {
+  console.log('Seeding initial database...');
+  seedDatabaseInternal();
   saveDatabase();
 }
 
+async function saveToMongoBackground() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+
+  saveTimeout = setTimeout(async () => {
+    try {
+      const client = await connectToMongo();
+      if (client) {
+        const uri = process.env.MONGODB_URI || process.env.MONGO_URI || '';
+        const dbName = uri.split('/').pop()?.split('?')[0] || 'mrkien_erp';
+        const db = client.db(dbName);
+        const col = db.collection<any>('system_state');
+        
+        // Deep clone state before writing to MongoDB to avoid concurrent memory read/write races
+        const stateCopy = JSON.parse(JSON.stringify(dbState));
+        await col.updateOne({ _id: 'main' }, { $set: stateCopy }, { upsert: true });
+        console.log('☁️ Successfully backed up database state to MongoDB Atlas Cloud!');
+      }
+    } catch (err) {
+      console.error('Failed to sync state to MongoDB Atlas in background:', err);
+    } finally {
+      saveTimeout = null;
+    }
+  }, 1000); // 1-second debounce delay to bundle rapid changes (like active audit logging)
+}
+
 export function saveDatabase() {
+  // Always write locally to support local operation as a primary fast write-through cache
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(dbState, null, 2), 'utf8');
   } catch (e) {
-    console.error('Failed to write db.json:', e);
+    console.error('Failed to write local backup db.json:', e);
+  }
+
+  // Trigger background replication if MONGODB_URI/MONGO_URI is set
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (uri) {
+    saveToMongoBackground().catch(err => {
+      console.error('Unhandled background MongoDB save error:', err);
+    });
   }
 }
 
