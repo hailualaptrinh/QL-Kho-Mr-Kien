@@ -72,7 +72,8 @@ export function formatDate(isoString: string, includeTime: boolean = true): stri
 
 // Simulate client-side Excel download via CSV format (UTF-8 BOM to survive Excel import)
 export function exportToCSV(filename: string, headers: string[], data: any[][]) {
-  let csvContent = '\uFEFF'; // Add BOM for Excel UTF-8 display compatibility
+  let csvContent = '\uFEFFsep=,\r\n'; // Add BOM and explicitly declare separator for Microsoft Excel compatibility
+
   
   // Headers row
   csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\r\n';

@@ -9,7 +9,12 @@ import {
   Settings, LogOut, Bell, Sun, Moon, Key, Check, Info, AlertOctagon, 
   Menu, X, Lock, RefreshCw, Activity 
 } from 'lucide-react';
-import { decodeJWT, formatCurrency, formatDate } from './utils';
+import { decodeJWT, formatCurrency, formatDate, signJWT } from './utils';
+import { 
+  INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_SUPPLIERS, INITIAL_CUSTOMERS, 
+  INITIAL_PRODUCTS, INITIAL_WAREHOUSES, INITIAL_EMPLOYEES, INITIAL_NOTIFICATIONS,
+  INITIAL_IMPORTS, INITIAL_EXPORTS, INITIAL_STOCKTAKES, INITIAL_MUTATIONS
+} from './mockData';
 
 // Sub components
 import Dashboard from './components/Dashboard';
@@ -28,6 +33,278 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(localStorage.getItem('mrkien_dark_mode') === 'true');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+
+  // Static Offline Mode Detection for Serverless Platforms like GitHub Pages
+  const [isStaticMode, setIsStaticMode] = useState<boolean>(() => {
+    const forced = localStorage.getItem('mrkien_static_mode');
+    if (forced !== null) return forced === 'true';
+    return window.location.hostname.includes('github.io');
+  });
+
+  const getLocalDB = (key: string, defaultValue: any) => {
+    const val = localStorage.getItem(`mrkien_db_${key}`);
+    if (val === null) {
+      localStorage.setItem(`mrkien_db_${key}`, JSON.stringify(defaultValue));
+      return defaultValue;
+    }
+    try {
+      return JSON.parse(val);
+    } catch {
+      return defaultValue;
+    }
+  };
+
+  const setLocalDB = (key: string, value: any) => {
+    localStorage.setItem(`mrkien_db_${key}`, JSON.stringify(value));
+  };
+
+  const addLocalLog = (actionType: string, description: string) => {
+    const list = getLocalDB('logs', []);
+    list.unshift({
+      id: `log-${Date.now()}`,
+      userId: user?.id || 'admin',
+      username: user?.username || 'admin',
+      actionType,
+      description,
+      timestamp: new Date().toISOString()
+    });
+    setLocalDB('logs', list);
+  };
+
+  const handleLocalPost = (endpoint: string, payload: any) => {
+    if (endpoint.startsWith('/api/products')) {
+      const newProduct = { ...payload, id: `prod-${Date.now()}` };
+      const list = getLocalDB('products', INITIAL_PRODUCTS);
+      list.unshift(newProduct);
+      setLocalDB('products', list);
+      addLocalLog('THIẾT LẬP KHO', `Đã thêm mới sản phẩm: "${payload.name}" (${payload.code})`);
+      setTimeout(() => fetchAllStates(), 10);
+      return newProduct;
+    }
+    if (endpoint.startsWith('/api/imports')) {
+      const newImport = { ...payload, id: `imp-${Date.now()}`, createdAt: new Date().toISOString() };
+      const list = getLocalDB('imports', INITIAL_IMPORTS);
+      list.unshift(newImport);
+      setLocalDB('imports', list);
+      
+      const prods = getLocalDB('products', INITIAL_PRODUCTS);
+      payload.items.forEach((item: any) => {
+        const p = prods.find((prod: any) => prod.id === item.productId);
+        if (p) p.stock += item.quantity;
+      });
+      setLocalDB('products', prods);
+      
+      addLocalLog('NHẬP KHO', `Đã nhập nhập kho đơn hàng mã [${payload.code}] trị giá ${formatCurrency(payload.totalAmount)}`);
+      setTimeout(() => fetchAllStates(), 10);
+      return newImport;
+    }
+    if (endpoint.startsWith('/api/exports')) {
+      const newExport = { ...payload, id: `exp-${Date.now()}`, createdAt: new Date().toISOString() };
+      const list = getLocalDB('exports', INITIAL_EXPORTS);
+      list.unshift(newExport);
+      setLocalDB('exports', list);
+      
+      const prods = getLocalDB('products', INITIAL_PRODUCTS);
+      payload.items.forEach((item: any) => {
+        const p = prods.find((prod: any) => prod.id === item.productId);
+        if (p) p.stock = Math.max(0, p.stock - item.quantity);
+      });
+      setLocalDB('products', prods);
+      
+      addLocalLog('XUẤT KHO', `Đã xuất kho đơn hàng mã [${payload.code}] trị giá ${formatCurrency(payload.totalAmount || 0)}`);
+      setTimeout(() => fetchAllStates(), 10);
+      return newExport;
+    }
+    if (endpoint.startsWith('/api/stocktakes')) {
+      const newSt = { ...payload, id: `st-${Date.now()}`, createdAt: new Date().toISOString() };
+      const list = getLocalDB('stocktakes', INITIAL_STOCKTAKES);
+      list.unshift(newSt);
+      setLocalDB('stocktakes', list);
+      
+      const prods = getLocalDB('products', INITIAL_PRODUCTS);
+      payload.items.forEach((item: any) => {
+        const p = prods.find((prod: any) => prod.id === item.productId);
+        if (p) p.stock = item.actualQuantity;
+      });
+      setLocalDB('products', prods);
+      
+      addLocalLog('KIỂM KHO', `Đã thực hiện kiểm kê kho đối soát khớp số tồn thực tế`);
+      setTimeout(() => fetchAllStates(), 10);
+      return newSt;
+    }
+    if (endpoint.startsWith('/api/apikeys')) {
+      if (endpoint.endsWith('/toggle')) {
+        const id = endpoint.split('/')[3];
+        const list = getLocalDB('apikeys', []);
+        const found = list.find((k: any) => k.id === id);
+        if (found) {
+          found.status = found.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+          setLocalDB('apikeys', list);
+          addLocalLog('THIẾT LẬP API', `Đã đổi trạng thái API key "${found.name}" thành [${found.status}]`);
+        }
+        setTimeout(() => fetchAllStates(), 10);
+        return found;
+      } else {
+        const newKey = {
+          id: `key-${Date.now()}`,
+          name: payload.name,
+          key: `mrkien_api_${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`,
+          createdAt: new Date().toISOString(),
+          status: 'ACTIVE'
+        };
+        const list = getLocalDB('apikeys', []);
+        list.unshift(newKey);
+        setLocalDB('apikeys', list);
+        addLocalLog('THIẾT LẬP API', `Đã khởi tạo khóa kết nối API mới "${payload.name}"`);
+        setTimeout(() => fetchAllStates(), 10);
+        return newKey;
+      }
+    }
+    if (endpoint.startsWith('/api/customers')) {
+      const item = { ...payload, id: `cus-${Date.now()}` };
+      const list = getLocalDB('customers', INITIAL_CUSTOMERS);
+      list.unshift(item);
+      setLocalDB('customers', list);
+      addLocalLog('ĐỐI TÁC', `Thêm mới khách hàng: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return item;
+    }
+    if (endpoint.startsWith('/api/suppliers')) {
+      const item = { ...payload, id: `sup-${Date.now()}` };
+      const list = getLocalDB('suppliers', INITIAL_SUPPLIERS);
+      list.unshift(item);
+      setLocalDB('suppliers', list);
+      addLocalLog('ĐỐI TÁC', `Thêm mới nhà cung cấp: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return item;
+    }
+    if (endpoint.startsWith('/api/employees')) {
+      const item = { ...payload, id: `emp-${Date.now()}` };
+      const list = getLocalDB('employees', INITIAL_EMPLOYEES);
+      list.unshift(item);
+      setLocalDB('employees', list);
+      addLocalLog('NHÂN SỰ', `Thêm nhân sự mới: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return item;
+    }
+    if (endpoint.startsWith('/api/warehouses')) {
+      const item = { ...payload, id: `wh-${Date.now()}` };
+      const list = getLocalDB('warehouses', INITIAL_WAREHOUSES);
+      list.unshift(item);
+      setLocalDB('warehouses', list);
+      addLocalLog('THIẾT LẬP KHO', `Mở phân khu kho mới: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return item;
+    }
+    return payload;
+  };
+
+  const handleLocalPut = (endpoint: string, payload: any) => {
+    if (endpoint.startsWith('/api/products/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('products', INITIAL_PRODUCTS);
+      const updatedList = list.map((p: any) => p.id === id ? { ...p, ...payload } : p);
+      setLocalDB('products', updatedList);
+      addLocalLog('THIẾT LẬP KHO', `Đã cập nhật chi tiết sản phẩm: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { id, ...payload };
+    }
+    if (endpoint.startsWith('/api/customers/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('customers', INITIAL_CUSTOMERS);
+      const updatedList = list.map((p: any) => p.id === id ? { ...p, ...payload } : p);
+      setLocalDB('customers', updatedList);
+      addLocalLog('ĐỐI TÁC', `Đã cập nhật thông tin khách hàng: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { id, ...payload };
+    }
+    if (endpoint.startsWith('/api/suppliers/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('suppliers', INITIAL_SUPPLIERS);
+      const updatedList = list.map((p: any) => p.id === id ? { ...p, ...payload } : p);
+      setLocalDB('suppliers', updatedList);
+      addLocalLog('ĐỐI TÁC', `Đã cập nhật nhà cung cấp: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { id, ...payload };
+    }
+    if (endpoint.startsWith('/api/employees/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('employees', INITIAL_EMPLOYEES);
+      const updatedList = list.map((p: any) => p.id === id ? { ...p, ...payload } : p);
+      setLocalDB('employees', updatedList);
+      addLocalLog('NHÂN SỰ', `Cập nhật thông tin nhân viên: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { id, ...payload };
+    }
+    if (endpoint.startsWith('/api/warehouses/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('warehouses', INITIAL_WAREHOUSES);
+      const updatedList = list.map((p: any) => p.id === id ? { ...p, ...payload } : p);
+      setLocalDB('warehouses', updatedList);
+      addLocalLog('THIẾT LẬP KHO', `Cập nhật thông tin phân khu kho: "${payload.name}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { id, ...payload };
+    }
+    return payload;
+  };
+
+  const handleLocalDelete = (endpoint: string) => {
+    if (endpoint.startsWith('/api/products/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('products', INITIAL_PRODUCTS);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('products', list.filter((p: any) => p.id !== id));
+      addLocalLog('THIẾT LẬP KHO', `Đã xoá sản phẩm: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    if (endpoint.startsWith('/api/apikeys/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('apikeys', []);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('apikeys', list.filter((p: any) => p.id !== id));
+      addLocalLog('THIẾT LẬP API', `Đã thu hồi API key: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    if (endpoint.startsWith('/api/customers/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('customers', INITIAL_CUSTOMERS);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('customers', list.filter((p: any) => p.id !== id));
+      addLocalLog('ĐỐI TÁC', `Xoá khách hàng: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    if (endpoint.startsWith('/api/suppliers/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('suppliers', INITIAL_SUPPLIERS);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('suppliers', list.filter((p: any) => p.id !== id));
+      addLocalLog('ĐỐI TÁC', `Xoá nhà cung cấp: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    if (endpoint.startsWith('/api/employees/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('employees', INITIAL_EMPLOYEES);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('employees', list.filter((p: any) => p.id !== id));
+      addLocalLog('NHÂN SỰ', `Cho nghỉ việc nhân viên: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    if (endpoint.startsWith('/api/warehouses/')) {
+      const id = endpoint.split('/')[3];
+      const list = getLocalDB('warehouses', INITIAL_WAREHOUSES);
+      const target = list.find((p: any) => p.id === id);
+      setLocalDB('warehouses', list.filter((p: any) => p.id !== id));
+      addLocalLog('THIẾT LẬP KHO', `Đóng cửa phân kho: "${target?.name || id}"`);
+      setTimeout(() => fetchAllStates(), 10);
+      return { success: true };
+    }
+    return { success: true };
+  };
 
   // Core ERP states fetched from backend API
   const [stats, setStats] = useState<any>(null);
@@ -85,6 +362,60 @@ export default function App() {
   // Load backend states
   const fetchAllStates = async () => {
     if (!token) return;
+
+    if (isStaticMode) {
+      const loadedProducts = getLocalDB('products', INITIAL_PRODUCTS);
+      const loadedCategories = getLocalDB('categories', INITIAL_CATEGORIES);
+      const loadedSuppliers = getLocalDB('suppliers', INITIAL_SUPPLIERS);
+      const loadedCustomers = getLocalDB('customers', INITIAL_CUSTOMERS);
+      const loadedEmployees = getLocalDB('employees', INITIAL_EMPLOYEES);
+      const loadedImports = getLocalDB('imports', INITIAL_IMPORTS);
+      const loadedExports = getLocalDB('exports', INITIAL_EXPORTS);
+      const loadedMutations = getLocalDB('mutations', INITIAL_MUTATIONS);
+      const loadedStocktakes = getLocalDB('stocktakes', INITIAL_STOCKTAKES);
+      const loadedLogs = getLocalDB('logs', []);
+      const loadedNotifs = getLocalDB('notifications', INITIAL_NOTIFICATIONS);
+      const loadedWarehouses = getLocalDB('warehouses', INITIAL_WAREHOUSES);
+
+      // Recalculate dashboard-stats dynamically
+      const totalImportVal = loadedImports.reduce((acc: number, item: any) => acc + (item.totalAmount || 0), 0);
+      const totalExportVal = loadedExports.reduce((acc: number, item: any) => acc + (item.totalAmount || 0), 0);
+      const totalStockItems = loadedProducts.reduce((acc: number, item: any) => acc + (item.stock || 0), 0);
+      const lowStockAlerts = loadedProducts.filter((p: any) => p.stock <= p.minStock).length;
+
+      const mockStats = {
+        totalProducts: loadedProducts.length,
+        totalStock: totalStockItems,
+        lowStockItems: lowStockAlerts,
+        totalImports: loadedImports.length,
+        totalExports: loadedExports.length,
+        totalImportValue: totalImportVal,
+        totalExportValue: totalExportVal,
+        monthlyStats: [
+          { month: 'T1', nhap: 120000000, xuat: 150000000 },
+          { month: 'T2', nhap: 90000000, xuat: 110000000 },
+          { month: 'T3', nhap: 210000000, xuat: 280000000 },
+          { month: 'T4', nhap: 170000000, xuat: 230000000 },
+          { month: 'T5', nhap: totalImportVal > 0 ? totalImportVal : 340000000, xuat: totalExportVal > 0 ? totalExportVal : 410000000 }
+        ]
+      };
+
+      setStats(mockStats);
+      setProducts(loadedProducts);
+      setCategories(loadedCategories);
+      setSuppliers(loadedSuppliers);
+      setCustomers(loadedCustomers);
+      setEmployees(loadedEmployees);
+      setImports(loadedImports);
+      setExports(loadedExports);
+      setMutations(loadedMutations);
+      setStocktakes(loadedStocktakes);
+      setLogs(loadedLogs);
+      setNotifications(loadedNotifs);
+      setWarehouses(loadedWarehouses);
+      return;
+    }
+
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
@@ -151,6 +482,31 @@ export default function App() {
     setLoginError('');
     setLoginLoading(true);
 
+    if (isStaticMode) {
+      setTimeout(() => {
+        if (
+          (loginUsername === 'admin' && loginPassword === 'admin123') || 
+          (loginUsername === 'client' && loginPassword === 'password')
+        ) {
+          const role = loginUsername === 'admin' ? 'ADMIN' : 'CLIENT';
+          const tokenPayload = { id: loginUsername === 'admin' ? 'usr-1' : 'usr-2', username: loginUsername, role, exp: Math.floor(Date.now() / 1000) + 86400 };
+          const mockToken = signJWT(tokenPayload);
+          setToken(mockToken);
+          setUser({
+            id: tokenPayload.id,
+            username: loginUsername,
+            role,
+            fullName: loginUsername === 'admin' ? 'Mr. Cao Kiên (ADMIN)' : 'Nhân viên Xuất nhập hàng (CLIENT)'
+          });
+          setActiveTab('dashboard');
+        } else {
+          setLoginError('Tài khoản hoặc mật khẩu không chính xác.');
+        }
+        setLoginLoading(false);
+      }, 300);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -182,6 +538,9 @@ export default function App() {
 
   // POST payloads triggered inside components
   const makePostCall = async (endpoint: string, payload: any) => {
+    if (isStaticMode) {
+      return handleLocalPost(endpoint, payload);
+    }
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -204,6 +563,9 @@ export default function App() {
   };
 
   const makePutCall = async (endpoint: string, payload: any) => {
+    if (isStaticMode) {
+      return handleLocalPut(endpoint, payload);
+    }
     try {
       const res = await fetch(endpoint, {
         method: 'PUT',
@@ -226,6 +588,9 @@ export default function App() {
   };
 
   const makeDeleteCall = async (endpoint: string) => {
+    if (isStaticMode) {
+      return handleLocalDelete(endpoint);
+    }
     try {
       const res = await fetch(endpoint, {
         method: 'DELETE',
@@ -307,9 +672,27 @@ export default function App() {
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             {loginError && (
-              <div className="p-3 bg-red-500/10 border border-red-540/20 text-red-400 text-xs rounded-xl font-bold flex items-center gap-2">
-                <AlertOctagon className="h-4 w-4" />
-                <span>{loginError}</span>
+              <div className="p-3 bg-red-500/10 border border-red-540/20 text-red-400 text-xs rounded-xl font-bold space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertOctagon className="h-4 w-4 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+                {loginError.includes('Không thể kết nối') && (
+                  <div className="pt-2 border-t border-red-500/10 text-[10.5px] font-normal leading-relaxed text-slate-300">
+                    Phát hiện máy chủ API Node.js không khả dụng (phổ biến khi chạy trên môi trường tĩnh như GitHub Pages). Hãy nhấp nút bên dưới để chuyển sang <strong>Chế độ Ngoại tuyến (Static Storage)</strong> để có thể đăng nhập & trải nghiệm toàn bộ tính năng 100%:
+                    <button
+                      type="button" 
+                      onClick={() => {
+                        setIsStaticMode(true);
+                        localStorage.setItem('mrkien_static_mode', 'true');
+                        setLoginError('');
+                      }}
+                      className="w-full mt-2 cursor-pointer p-2 text-xs font-bold text-center border border-amber-500/30 hover:border-amber-500 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 hover:text-white rounded-lg transition-colors"
+                    >
+                      ⚡ Chuyển sang Chế độ Ngoại tuyến (Static Demo)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -411,6 +794,9 @@ export default function App() {
               <div>
                 <span className="text-white font-extrabold text-sm block tracking-wide">MR KIÊN ERP</span>
                 <span className="text-[10px] text-slate-400 font-semibold tracking-widest block uppercase">- Warehouse System -</span>
+                {isStaticMode && (
+                  <span className="inline-block mt-1 px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[9px] font-bold tracking-wider uppercase">Offline Demo</span>
+                )}
               </div>
             )}
           </div>
@@ -550,6 +936,26 @@ export default function App() {
             {/* Mobile Title */}
             <div className="md:hidden">
               <span className="font-extrabold text-slate-900 dark:text-white text-base">MR KIÊN ERP</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const toggledState = !isStaticMode;
+                  setIsStaticMode(toggledState);
+                  localStorage.setItem('mrkien_static_mode', toggledState ? 'true' : 'false');
+                  setTimeout(() => window.location.reload(), 150);
+                }}
+                className={`text-[10px] sm:text-xs font-bold px-2.5 sm:px-3.5 py-1.5 rounded-full cursor-pointer transition-all flex items-center gap-1.5 ${
+                  isStaticMode 
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25' 
+                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                }`}
+                title="Bấm để chuyển đổi giữa kết nối Live API và Chế độ Lưu trữ Ngoại tuyến"
+              >
+                <Activity className={`h-3 w-3 ${isStaticMode ? 'animate-pulse text-amber-500' : 'text-emerald-500'}`} />
+                <span>Ngoại tuyến: {isStaticMode ? 'ĐANG BẬT (Demo)' : 'TẮT (Live API)'}</span>
+              </button>
             </div>
           </div>
 
