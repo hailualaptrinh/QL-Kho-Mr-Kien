@@ -3,7 +3,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Role = 'ADMIN' | 'CLIENT';
+export type Role = 'SUPER_ADMIN' | 'MANAGER' | 'STOCKKEEPER' | 'SALES' | 'VIEWER';
+
+export interface UserPermissions {
+  view_products: boolean;
+  add_products: boolean;
+  edit_products: boolean;
+  delete_products: boolean;
+  view_imports: boolean;
+  add_imports: boolean;
+  view_exports: boolean;
+  add_exports: boolean;
+  approve_exports: boolean;
+  view_customers: boolean;
+  add_edit_customers: boolean;
+  view_suppliers: boolean;
+  add_edit_suppliers: boolean;
+  view_employees: boolean;
+  manage_employees: boolean;
+  manage_settings: boolean;
+}
 
 export interface User {
   id: string;
@@ -14,11 +33,7 @@ export interface User {
   avatar?: string;
   role: Role;
   status: 'ACTIVE' | 'INACTIVE';
-  permissions?: {
-    canAdd: boolean;
-    canEdit: boolean;
-    canDelete: boolean;
-  };
+  permissions?: UserPermissions;
 }
 
 export interface Category {

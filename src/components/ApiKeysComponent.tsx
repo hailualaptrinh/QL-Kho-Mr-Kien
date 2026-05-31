@@ -170,13 +170,14 @@ else:
   };
 
   // Only permit Admins to configure API keys
-  if (user?.role !== 'ADMIN') {
+  const hasSettingsPerm = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || !!user?.permissions?.manage_settings;
+  if (!hasSettingsPerm) {
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 text-center max-w-lg mx-auto">
         <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">Quyền Truy Cập Bị Hạn Chế</h2>
         <p className="text-slate-500 dark:text-slate-400 text-xs mt-2 leading-relaxed">
-          Chỉ có Quản Trị Viên (ADMIN) mới có quyền tạo mới, thu hồi hoặc thay đổi các cấu hình khóa API kết nối hệ thống. Vui lòng liên hệ với ban quản lý Mr Kiên ERP để được hỗ trợ.
+          Chỉ có Quản Trị Viên Hệ Thống mới có quyền tạo mới, thu hồi hoặc thay đổi các cấu hình khóa API kết nối hệ thống. Vui lòng liên hệ với ban quản lý Mr Kiên ERP để được hỗ trợ.
         </p>
       </div>
     );

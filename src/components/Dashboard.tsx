@@ -82,7 +82,13 @@ export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: 
             Chào mừng trở lại, {user?.fullName || 'Người dùng'}!
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Hệ thống ERP của bạn đang hoạt động bình thường • Vai trò: <span className="font-semibold text-blue-600 dark:text-blue-400">{user?.role === 'ADMIN' ? 'QUẢN TRỊ VIÊN' : 'KHÁCH HÀNG / CLIENT'}</span>
+            Hệ thống ERP của bạn đang hoạt động bình thường • Vai trò: <span className="font-semibold text-blue-600 dark:text-blue-400">
+              {user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' ? 'QUẢN TRỊ VIÊN CẤP CAO' :
+               user?.role === 'MANAGER' ? 'QUẢN LÝ CHI NHÁNH' :
+               user?.role === 'STOCKKEEPER' ? 'THỦ KHO CHI NHÁNH' :
+               user?.role === 'SALES' ? 'NHÂN VIÊN KINH DOANH' :
+               user?.role === 'VIEWER' ? 'BAN GIÁM SÁT / CHỈ XEM' : user?.role || ''}
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -269,7 +275,7 @@ export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: 
               )}
             </div>
 
-            {user?.role === 'ADMIN' && stats.alertProducts?.length > 0 && (
+            {user?.role !== 'VIEWER' && stats.alertProducts?.length > 0 && (
               <button 
                 id="btn-nav-imports"
                 onClick={() => onNavigate('imports')}

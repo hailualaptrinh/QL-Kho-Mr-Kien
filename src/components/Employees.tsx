@@ -20,6 +20,7 @@ interface EmployeesProps {
 export default function Employees({ 
   employees, user, usersList = [], onAddEmployee, onUpdateEmployee, onUpdateUserPermissions, onRefresh 
 }: EmployeesProps) {
+  const canManageEmp = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || !!user?.permissions?.manage_employees;
   const [activeSubTab, setActiveSubTab] = useState<'employees' | 'permissions'>('employees');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -40,8 +41,8 @@ export default function Employees({
   };
 
   const handleToggleStatus = async (emp: Employee) => {
-    if (user?.role !== 'ADMIN') {
-      alert('Chỉ quản trị viên cấp cao mới có quyền thay đổi trạng thái nhân viên ERP!');
+    if (!canManageEmp) {
+      alert('Chỉ quản trị viên hoặc Quản lý kho mới có quyền thay đổi trạng thái nhân viên ERP!');
       return;
     }
     const newStatus = emp.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -49,9 +50,9 @@ export default function Employees({
     alert(`Đã đổi trạng thái sang: ${newStatus === 'ACTIVE' ? 'KÍCH HOẠT' : 'TẠM NGỪNG HỒ SƠ'}`);
   };
 
-  const handleUserPermissionToggle = async (userId: string, permissionKey: 'canAdd' | 'canEdit' | 'canDelete', currentValue: boolean) => {
-    if (user?.role !== 'ADMIN') {
-      alert('Chỉ quản trị viên mới có quyền cập nhật phân quyền hệ thống!');
+  const handleUserPermissionToggle = async (userId: string, permissionKey: string, currentValue: boolean) => {
+    if (!canManageEmp) {
+      alert('Chỉ quản trị viên hoặc Quản lý kho mới có quyền cập nhật phân quyền hệ thống!');
       return;
     }
 
@@ -79,8 +80,8 @@ export default function Employees({
   };
 
   const handleUserRoleChange = async (userId: string, newRole: string) => {
-    if (user?.role !== 'ADMIN') {
-      alert('Chỉ quản trị viên mới có quyền nâng cấp vai trò tài khoản!');
+    if (!canManageEmp) {
+      alert('Chỉ quản trị viên hoặc Quản lý kho mới có quyền nâng cấp vai trò tài khoản!');
       return;
     }
 
@@ -99,8 +100,8 @@ export default function Employees({
   };
 
   const handleUserStatusToggle = async (userId: string, currentStatus: string) => {
-    if (user?.role !== 'ADMIN') {
-      alert('Chỉ quản trị viên mới có quyền tắt/mở an ninh tài khoản!');
+    if (!canManageEmp) {
+      alert('Chỉ quản trị viên hoặc Quản lý kho mới có quyền tắt/mở an ninh tài khoản!');
       return;
     }
 
@@ -132,7 +133,7 @@ export default function Employees({
         </div>
 
         <div className="flex items-center gap-2">
-          {activeSubTab === 'employees' && user?.role === 'ADMIN' && (
+          {activeSubTab === 'employees' && canManageEmp && (
             <button
               onClick={() => setIsModalOpen(true)}
               className="px-4.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow cursor-pointer active:scale-95 transition-all"
@@ -217,7 +218,7 @@ export default function Employees({
                     {isActive ? 'ĐANG KÍCH HOẠT' : 'ĐÃ TẠM PHONG TOẢ'}
                   </span>
 
-                  {user?.role === 'ADMIN' ? (
+                  {canManageEmp ? (
                     <button
                       onClick={() => handleToggleStatus(emp)}
                       className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
@@ -230,7 +231,7 @@ export default function Employees({
                       )}
                     </button>
                   ) : (
-                    <Shield className="h-4 w-4 text-slate-300" title="Chỉ Admin mới có quyền thao tác" />
+                    <Shield className="h-4 w-4 text-slate-300" title="Chỉ Quản trị/Quản lý mới có quyền thao tác" />
                   )}
                 </div>
               </div>
@@ -299,18 +300,29 @@ export default function Employees({
                         </td>
 
                         <td className="p-4">
-                          {user?.role === 'ADMIN' ? (
+                          {canManageEmp ? (
                             <select
                               value={item.role}
                               onChange={(e) => handleUserRoleChange(item.id, e.target.value)}
-                              className="p-1 px-2.5 bg-slate-100 dark:bg-slate-800 rounded border border-transparent font-bold text-xs focus:outline-none dark:text-white"
+                              className="p-1 px-2 bg-slate-100 dark:bg-slate-800 rounded border border-transparent font-bold text-[11px] focus:outline-none dark:text-white cursor-pointer"
                               disabled={updatingUserId === item.id}
                             >
-                              <option value="ADMIN">ADMIN (Quản trị)</option>
-                              <option value="CLIENT">CLIENT (Nhân viên)</option>
+                              <option value="SUPER_ADMIN">👑 SUPER_ADMIN</option>
+                              <option value="MANAGER">📦 MANAGER (Quản lý)</option>
+                              <option value="STOCKKEEPER">🔑 STOCKKEEPER (Thủ kho)</option>
+                              <option value="SALES">💼 SALES (Bán hàng)</option>
+                              <option value="VIEWER">👁️ VIEWER (Chỉ xem)</option>
+                              <option value="ADMIN">ADMIN</option>
+                              <option value="CLIENT">CLIENT</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isAdmin ? 'bg-indigo-500/10 text-indigo-500' : 'bg-slate-100 text-slate-550'}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              (item.role === 'SUPER_ADMIN' || item.role === 'ADMIN') ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                              item.role === 'MANAGER' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                              item.role === 'STOCKKEEPER' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                              item.role === 'SALES' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                              'bg-slate-500/10 text-slate-550 border border-slate-500/20'
+                            }`}>
                               {item.role}
                             </span>
                           )}
@@ -329,7 +341,7 @@ export default function Employees({
                                 checked={!!perms.canAdd}
                                 onChange={() => handleUserPermissionToggle(item.id, 'canAdd', !!perms.canAdd)}
                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4.5 w-4.5 cursor-pointer disabled:opacity-50"
-                                disabled={updatingUserId === item.id || user?.role !== 'ADMIN'}
+                                disabled={updatingUserId === item.id || !canManageEmp}
                               />
                             </label>
                           )}
@@ -348,7 +360,7 @@ export default function Employees({
                                 checked={!!perms.canEdit}
                                 onChange={() => handleUserPermissionToggle(item.id, 'canEdit', !!perms.canEdit)}
                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4.5 w-4.5 cursor-pointer"
-                                disabled={updatingUserId === item.id || user?.role !== 'ADMIN'}
+                                disabled={updatingUserId === item.id || !canManageEmp}
                               />
                             </label>
                           )}
@@ -367,7 +379,7 @@ export default function Employees({
                                 checked={!!perms.canDelete}
                                 onChange={() => handleUserPermissionToggle(item.id, 'canDelete', !!perms.canDelete)}
                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4.5 w-4.5 cursor-pointer"
-                                disabled={updatingUserId === item.id || user?.role !== 'ADMIN'}
+                                disabled={updatingUserId === item.id || !canManageEmp}
                               />
                             </label>
                           )}
@@ -376,7 +388,7 @@ export default function Employees({
                         {/* ACTIVE STATUS TOGGLE */}
                         <td className="p-4">
                           <div className="flex items-center gap-2">
-                            {user?.role === 'ADMIN' ? (
+                            {canManageEmp ? (
                               <button
                                 onClick={() => handleUserStatusToggle(item.id, item.status)}
                                 className={`text-xs font-bold px-2 px-3 py-1.5 rounded-xl cursor-pointer shadow-sm transition-all text-center flex items-center gap-1 ${

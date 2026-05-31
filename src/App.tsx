@@ -465,14 +465,23 @@ export default function App() {
   }, [token, activeTab]);
 
   // 1-CLICK PRESENTS TO SPEED UP TESTING FOR CLIENTS
-  const handleQuickLogin = (role: 'ADMIN' | 'CLIENT') => {
+  const handleQuickLogin = (type: 'SUPER_ADMIN' | 'MANAGER' | 'STOCKKEEPER' | 'SALES' | 'VIEWER') => {
     setLoginError('');
-    if (role === 'ADMIN') {
+    if (type === 'SUPER_ADMIN') {
       setLoginUsername('admin');
       setLoginPassword('admin123');
-    } else {
-      setLoginUsername('client');
-      setLoginPassword('password');
+    } else if (type === 'MANAGER') {
+      setLoginUsername('manager');
+      setLoginPassword('manager123');
+    } else if (type === 'STOCKKEEPER') {
+      setLoginUsername('kho1');
+      setLoginPassword('kho123');
+    } else if (type === 'SALES') {
+      setLoginUsername('sales1');
+      setLoginPassword('sales123');
+    } else if (type === 'VIEWER') {
+      setLoginUsername('viewer');
+      setLoginPassword('view123');
     }
   };
 
@@ -483,19 +492,66 @@ export default function App() {
 
     if (isStaticMode) {
       setTimeout(() => {
-        if (
-          (loginUsername === 'admin' && loginPassword === 'admin123') || 
-          (loginUsername === 'client' && loginPassword === 'password')
-        ) {
-          const role = loginUsername === 'admin' ? 'ADMIN' : 'CLIENT';
-          const tokenPayload = { id: loginUsername === 'admin' ? 'usr-1' : 'usr-2', username: loginUsername, role, exp: Math.floor(Date.now() / 1000) + 86400 };
+        const credentialsMap: Record<string, string> = {
+          'admin': 'admin123',
+          'manager': 'manager123',
+          'kho1': 'kho123',
+          'sales1': 'sales123',
+          'viewer': 'view123'
+        };
+
+        const expectedPass = credentialsMap[loginUsername];
+        if (expectedPass && loginPassword === expectedPass) {
+          let role: any = 'SUPER_ADMIN';
+          let fullName = 'Hoàng Minh Cao (SUPER_ADMIN)';
+          let pid = 'usr-1';
+
+          if (loginUsername === 'manager') {
+            role = 'MANAGER';
+            fullName = 'Phạm Thanh Sơn (QUẢN LÝ KHO)';
+            pid = 'usr-2';
+          } else if (loginUsername === 'kho1') {
+            role = 'STOCKKEEPER';
+            fullName = 'Vũ Quốc Khánh (THỦ KHO)';
+            pid = 'usr-3';
+          } else if (loginUsername === 'sales1') {
+            role = 'SALES';
+            fullName = 'Nguyễn Thuỳ Trang (NV BÁN HÀNG)';
+            pid = 'usr-4';
+          } else if (loginUsername === 'viewer') {
+            role = 'VIEWER';
+            fullName = 'Lê Minh Tuấn (CHỈ XEM)';
+            pid = 'usr-5';
+          }
+
+          const tokenPayload = { id: pid, username: loginUsername, role, exp: Math.floor(Date.now() / 1000) + 86400 };
           const mockToken = signJWT(tokenPayload);
           setToken(mockToken);
           setUser({
             id: tokenPayload.id,
             username: loginUsername,
             role,
-            fullName: loginUsername === 'admin' ? 'Mr. Cao Kiên (ADMIN)' : 'Nhân viên Xuất nhập hàng (CLIENT)'
+            fullName,
+            avatar: `https://images.unsplash.com/photo-${loginUsername === 'admin' ? '1472099645785-5658abf4ff4e' : loginUsername === 'manager' ? '1519085360753-af0119f7cbe7' : loginUsername === 'kho1' ? '1507003211169-0a1dd7228f2d' : loginUsername === 'sales1' ? '1494790108377-be9c29b29330' : '1500648767791-00dcc994a43e'}?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80`,
+            status: 'ACTIVE',
+            permissions: {
+              view_products: true,
+              add_products: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              edit_products: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              delete_products: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              view_imports: role !== 'SALES',
+              add_imports: role === 'SUPER_ADMIN' || role === 'MANAGER' || role === 'STOCKKEEPER',
+              view_exports: true,
+              add_exports: role !== 'VIEWER',
+              approve_exports: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              view_customers: role !== 'STOCKKEEPER',
+              add_edit_customers: role === 'SUPER_ADMIN' || role === 'MANAGER' || role === 'SALES',
+              view_suppliers: role !== 'STOCKKEEPER' && role !== 'SALES',
+              add_edit_suppliers: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              view_employees: role !== 'STOCKKEEPER' && role !== 'SALES',
+              manage_employees: role === 'SUPER_ADMIN' || role === 'MANAGER',
+              manage_settings: role === 'SUPER_ADMIN'
+            }
           });
           setActiveTab('dashboard');
         } else {
@@ -729,24 +785,60 @@ export default function App() {
           <div className="mt-6 pt-5 border-t border-slate-800">
             <span className="block text-[10px] text-slate-450 font-extrabold uppercase text-center mb-3">TÀI KHOẢN TRẢI NGHIỆM NHANH</span>
             
-            <div className="grid grid-cols-2 gap-2.5">
-              <button 
-                id="btn-quick-admin"
-                onClick={() => handleQuickLogin('ADMIN')}
-                className="p-2 py-2.5 bg-slate-900 hover:bg-blue-900/30 text-white text-xs font-bold rounded-xl border border-slate-800 hover:border-blue-500/20 transition-all flex flex-col items-center gap-1 cursor-pointer"
-              >
-                <span>💼 Quản trị viên</span>
-                <span className="text-[9px] text-slate-500 font-mono">admin / admin123</span>
-              </button>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  id="btn-quick-super-admin"
+                  type="button"
+                  onClick={() => handleQuickLogin('SUPER_ADMIN')}
+                  className="p-2 py-2 bg-slate-900 hover:bg-red-500/15 text-white text-[11px] font-bold rounded-xl border border-slate-800 hover:border-red-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
+                >
+                  <span className="font-extrabold text-red-400">👑 Super Admin</span>
+                  <span className="text-[8.5px] text-slate-500 font-mono">admin / admin123</span>
+                </button>
 
-              <button 
-                id="btn-quick-client"
-                onClick={() => handleQuickLogin('CLIENT')}
-                className="p-2 py-2.5 bg-slate-900 hover:bg-emerald-900/30 text-white text-xs font-bold rounded-xl border border-slate-800 hover:border-emerald-500/20 transition-all flex flex-col items-center gap-1 cursor-pointer"
-              >
-                <span>👷 Khách hàng</span>
-                <span className="text-[9px] text-slate-500 font-mono">client / password</span>
-              </button>
+                <button 
+                  id="btn-quick-manager"
+                  type="button"
+                  onClick={() => handleQuickLogin('MANAGER')}
+                  className="p-2 py-2 bg-slate-900 hover:bg-blue-500/15 text-white text-[11px] font-bold rounded-xl border border-slate-800 hover:border-blue-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
+                >
+                  <span className="font-extrabold text-blue-400">📦 Quản lý kho</span>
+                  <span className="text-[8.5px] text-slate-500 font-mono">manager / manager123</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1.5">
+                <button 
+                  id="btn-quick-stockkeeper"
+                  type="button"
+                  onClick={() => handleQuickLogin('STOCKKEEPER')}
+                  className="p-1 py-1.5 bg-slate-900 hover:bg-emerald-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-emerald-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
+                >
+                  <span className="font-bold text-emerald-400">🔑 Thủ kho</span>
+                  <span className="text-[7.5px] text-slate-500 font-mono">kho1 / kho123</span>
+                </button>
+
+                <button 
+                  id="btn-quick-sales"
+                  type="button"
+                  onClick={() => handleQuickLogin('SALES')}
+                  className="p-1 py-1.5 bg-slate-900 hover:bg-amber-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-amber-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
+                >
+                  <span className="font-bold text-amber-400">💼 Sales</span>
+                  <span className="text-[7.5px] text-slate-500 font-mono">sales1 / sales123</span>
+                </button>
+
+                <button 
+                  id="btn-quick-viewer"
+                  type="button"
+                  onClick={() => handleQuickLogin('VIEWER')}
+                  className="p-1 py-1.5 bg-slate-900 hover:bg-slate-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-slate-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
+                >
+                  <span className="font-bold text-slate-400">👁️ Chỉ xem</span>
+                  <span className="text-[7.5px] text-slate-500 font-mono">viewer / view123</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -761,6 +853,37 @@ export default function App() {
 
   // Active count for unread alerts
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const hasPermission = (field: string): boolean => {
+    if (!user) return false;
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') return true;
+    if (user.permissions) {
+      return !!(user.permissions as any)[field];
+    }
+    // Fallback based on roles if no permissions defined yet
+    if (user.role === 'MANAGER') {
+      return field !== 'manage_settings';
+    }
+    if (user.role === 'STOCKKEEPER') {
+      return ['view_products', 'view_imports', 'add_imports', 'view_exports', 'add_exports', 'view_customers', 'view_suppliers'].includes(field);
+    }
+    if (user.role === 'SALES') {
+      return ['view_products', 'view_exports', 'add_exports', 'view_customers', 'add_edit_customers'].includes(field);
+    }
+    if (user.role === 'VIEWER') {
+      return ['view_products', 'view_imports', 'view_exports', 'view_customers', 'view_suppliers'].includes(field);
+    }
+    return false;
+  };
+
+  const getRoleLabel = (role?: string) => {
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN') return 'Super Admin 👑';
+    if (role === 'MANAGER') return 'Quản Lý Kho 📦';
+    if (role === 'STOCKKEEPER') return 'Thủ Kho 🔑';
+    if (role === 'SALES') return 'Nhân Viên Bán Hàng 💼';
+    if (role === 'VIEWER') return 'Đối Tác / Chỉ Xem 👁️';
+    return role || '';
+  };
 
   return (
     <div className="min-h-screen font-sans bg-slate-50 dark:bg-slate-950 flex transition-colors duration-150">
@@ -797,77 +920,93 @@ export default function App() {
               {isSidebarOpen && <span>Thống kê Dashboard</span>}
             </button>
 
-            <button
-              id="sidebar-nav-products"
-              onClick={() => setActiveTab('products')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'products' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Boxes className="h-4.5 w-4.5" />
-              {isSidebarOpen && <span>Danh Mục Sản Phẩm</span>}
-            </button>
+            {hasPermission('view_products') && (
+              <button
+                id="sidebar-nav-products"
+                onClick={() => setActiveTab('products')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'products' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Boxes className="h-4.5 w-4.5" />
+                {isSidebarOpen && <span>Danh Mục Sản Phẩm</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-imports"
-              onClick={() => setActiveTab('imports')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'imports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <ArrowDownLeft className="h-4.5 w-4.5 text-emerald-500" />
-              {isSidebarOpen && <span>Nhập Kho (Inbound)</span>}
-            </button>
+            {hasPermission('view_imports') && (
+              <button
+                id="sidebar-nav-imports"
+                onClick={() => setActiveTab('imports')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'imports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <ArrowDownLeft className="h-4.5 w-4.5 text-emerald-500" />
+                {isSidebarOpen && <span>Nhập Kho (Inbound)</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-exports"
-              onClick={() => setActiveTab('exports')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'exports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <ArrowUpRight className="h-4.5 w-4.5 text-blue-400" />
-              {isSidebarOpen && <span>Xuất Kho (Outbound)</span>}
-            </button>
+            {hasPermission('view_exports') && (
+              <button
+                id="sidebar-nav-exports"
+                onClick={() => setActiveTab('exports')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'exports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <ArrowUpRight className="h-4.5 w-4.5 text-blue-400" />
+                {isSidebarOpen && <span>Xuất Kho (Outbound)</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-warehouses"
-              onClick={() => setActiveTab('warehouses')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'warehouses' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Layers className="h-4.5 w-4.5" />
-              {isSidebarOpen && <span>Phân Khu Kho Bãi</span>}
-            </button>
+            {hasPermission('view_products') && (
+              <button
+                id="sidebar-nav-warehouses"
+                onClick={() => setActiveTab('warehouses')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'warehouses' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Layers className="h-4.5 w-4.5" />
+                {isSidebarOpen && <span>Phân Khu Kho Bãi</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-partners"
-              onClick={() => setActiveTab('partners')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'partners' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Users className="h-4.5 w-4.5" />
-              {isSidebarOpen && <span>Đối Tác & CRM</span>}
-            </button>
+            {(hasPermission('view_customers') || hasPermission('view_suppliers')) && (
+              <button
+                id="sidebar-nav-partners"
+                onClick={() => setActiveTab('partners')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'partners' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Users className="h-4.5 w-4.5" />
+                {isSidebarOpen && <span>Đối Tác & CRM</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-employees"
-              onClick={() => setActiveTab('employees')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'employees' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Shield className="h-4.5 w-4.5" />
-              {isSidebarOpen && <span>Nhân Sự Quản Lý</span>}
-            </button>
+            {hasPermission('view_employees') && (
+              <button
+                id="sidebar-nav-employees"
+                onClick={() => setActiveTab('employees')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'employees' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Shield className="h-4.5 w-4.5" />
+                {isSidebarOpen && <span>Nhân Sự Quản Lý</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-reports"
-              onClick={() => setActiveTab('reports')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'reports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Settings className="h-4.5 w-4.5" />
-              {isSidebarOpen && <span>Báo Cáo Tài Chính</span>}
-            </button>
+            {hasPermission('manage_settings') && (
+              <button
+                id="sidebar-nav-reports"
+                onClick={() => setActiveTab('reports')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'reports' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Settings className="h-4.5 w-4.5" />
+                {isSidebarOpen && <span>Báo Cáo Tài Chính</span>}
+              </button>
+            )}
 
-            <button
-              id="sidebar-nav-apikeys"
-              onClick={() => setActiveTab('apikeys')}
-              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'apikeys' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Key className="h-4.5 w-4.5 text-amber-500" />
-              {isSidebarOpen && <span>Cổng Kết Nối & API Key</span>}
-            </button>
+            {hasPermission('manage_settings') && (
+              <button
+                id="sidebar-nav-apikeys"
+                onClick={() => setActiveTab('apikeys')}
+                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'apikeys' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Key className="h-4.5 w-4.5 text-amber-500" />
+                {isSidebarOpen && <span>Cổng Kết Nối & API Key</span>}
+              </button>
+            )}
 
           </nav>
         </div>
@@ -985,7 +1124,15 @@ export default function App() {
             {/* Profile trigger */}
             <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
               <span className="text-xs font-bold text-slate-600 dark:text-slate-300 hidden md:inline">{user?.fullName}</span>
-              <span className="text-[9px] bg-blue-50/20 text-blue-600 border border-blue-500/20 px-2 py-0.5 rounded-full font-bold uppercase">{user?.role}</span>
+              <span className={`text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                user?.role === 'MANAGER' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                user?.role === 'STOCKKEEPER' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                user?.role === 'SALES' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                'bg-slate-500/10 text-slate-550 border-slate-500/20'
+              }`}>
+                {getRoleLabel(user?.role)}
+              </span>
             </div>
 
           </div>

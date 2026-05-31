@@ -32,32 +32,123 @@ router.post('/auth/login', (req, res) => {
 
   const db = getDb();
   
-  // Standard hardcoded admin check per user request "tên admin pass: admin123"
-  const isAdminCredentials = (username === 'admin' && password === 'admin123');
-  const isClientCredentials = (username === 'client' && password === 'password') || (username === 'khachhang' && password === 'password');
+  // Custom 5 roles mapping per user's prompt
+  const credentialsMap: Record<string, string> = {
+    'admin': 'admin123',
+    'manager': 'manager123',
+    'kho1': 'kho123',
+    'sales1': 'sales123',
+    'viewer': 'view123'
+  };
+
+  const expectedPassword = credentialsMap[username];
+  const isValidCredentials = expectedPassword && password === expectedPassword;
 
   let user = db.users.find(u => u.username === username || u.email === username);
 
-  if (isAdminCredentials) {
-    user = db.users.find(u => u.username === 'admin');
-  } else if (isClientCredentials) {
-    user = db.users.find(u => u.username === username);
-  }
-
-  // Fallback default admin if not matched in list but matches credentials
-  if (!user && isAdminCredentials) {
-    user = {
-      id: 'usr-1',
-      username: 'admin',
-      fullName: 'Mr. Cao Kiên (ADMIN)',
-      email: 'admin@mrkien-erp.com',
-      phone: '0988.777.888',
-      role: 'ADMIN',
-      status: 'ACTIVE'
+  // Fallback / Auto-register five primary test profiles if they don't exist in existing data records
+  if (!user && isValidCredentials) {
+    const fallbackTemplate: Record<string, any> = {
+      'admin': {
+        id: 'usr-1',
+        fullName: 'Hoàng Minh Cao (SUPER_ADMIN)',
+        email: 'admin@mrkien-erp.com',
+        phone: '0988.777.888',
+        role: 'SUPER_ADMIN',
+        status: 'ACTIVE',
+        permissions: {
+          view_products: true, add_products: true, edit_products: true, delete_products: true,
+          view_imports: true, add_imports: true,
+          view_exports: true, add_exports: true, approve_exports: true,
+          view_customers: true, add_edit_customers: true,
+          view_suppliers: true, add_edit_suppliers: true,
+          view_employees: true, manage_employees: true,
+          manage_settings: true
+        }
+      },
+      'manager': {
+        id: 'usr-2',
+        fullName: 'Phạm Thanh Sơn (QUẢN LÝ KHO)',
+        email: 'manager@mrkien-erp.com',
+        phone: '0905.123.456',
+        role: 'MANAGER',
+        status: 'ACTIVE',
+        permissions: {
+          view_products: true, add_products: true, edit_products: true, delete_products: true,
+          view_imports: true, add_imports: true,
+          view_exports: true, add_exports: true, approve_exports: true,
+          view_customers: true, add_edit_customers: true,
+          view_suppliers: true, add_edit_suppliers: true,
+          view_employees: true, manage_employees: true,
+          manage_settings: false
+        }
+      },
+      'kho1': {
+        id: 'usr-3',
+        fullName: 'Vũ Quốc Khánh (THỦ KHO)',
+        email: 'kho1@mrkien-erp.com',
+        phone: '0912.987.654',
+        role: 'STOCKKEEPER',
+        status: 'ACTIVE',
+        permissions: {
+          view_products: true, add_products: false, edit_products: false, delete_products: false,
+          view_imports: true, add_imports: true,
+          view_exports: true, add_exports: true, approve_exports: false,
+          view_customers: false, add_edit_customers: false,
+          view_suppliers: false, add_edit_suppliers: false,
+          view_employees: false, manage_employees: false,
+          manage_settings: false
+        }
+      },
+      'sales1': {
+        id: 'usr-4',
+        fullName: 'Nguyễn Thuỳ Trang (NV BÁN HÀNG)',
+        email: 'sales1@mrkien-erp.com',
+        phone: '0988.444.555',
+        role: 'SALES',
+        status: 'ACTIVE',
+        permissions: {
+          view_products: true, add_products: false, edit_products: false, delete_products: false,
+          view_imports: false, add_imports: false,
+          view_exports: true, add_exports: true, approve_exports: false,
+          view_customers: true, add_edit_customers: true,
+          view_suppliers: false, add_edit_suppliers: false,
+          view_employees: false, manage_employees: false,
+          manage_settings: false
+        }
+      },
+      'viewer': {
+        id: 'usr-5',
+        fullName: 'Lê Minh Tuấn (CHỈ XEM)',
+        email: 'viewer@mrkien-erp.com',
+        phone: '0977.333.444',
+        role: 'VIEWER',
+        status: 'ACTIVE',
+        permissions: {
+          view_products: true, add_products: false, edit_products: false, delete_products: false,
+          view_imports: true, add_imports: false,
+          view_exports: true, add_exports: false, approve_exports: false,
+          view_customers: true, add_edit_customers: false,
+          view_suppliers: true, add_edit_suppliers: false,
+          view_employees: true, manage_employees: false,
+          manage_settings: false
+        }
+      }
     };
+
+    const template = fallbackTemplate[username];
+    if (template) {
+      user = {
+        ...template,
+        username,
+        avatar: `https://images.unsplash.com/photo-${username === 'admin' ? '1472099645785-5658abf4ff4e' : username === 'manager' ? '1519085360753-af0119f7cbe7' : username === 'kho1' ? '1507003211169-0a1dd7228f2d' : username === 'sales1' ? '1494790108377-be9c29b29330' : '1500648767791-00dcc994a43e'}?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80`
+      } as any;
+      db.users.push(user);
+      saveDatabase();
+    }
   }
 
-  if (!user) {
+  if (!isValidCredentials || !user) {
     res.status(401).json({ error: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
     return;
   }
@@ -81,7 +172,8 @@ router.post('/auth/login', (req, res) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
-      avatar: user.avatar
+      avatar: user.avatar,
+      permissions: user.permissions
     }
   });
 });
@@ -116,7 +208,7 @@ router.get('/products', (req, res) => {
   res.json(getDb().products);
 });
 
-router.post('/products', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
+router.post('/products', authMiddleware, checkPermission('add_products'), (req: AuthenticatedRequest, res) => {
   const productData: Partial<Product> = req.body;
   const db = getDb();
 
@@ -160,7 +252,7 @@ router.post('/products', authMiddleware, checkPermission('ADD'), (req: Authentic
   res.status(201).json(newProduct);
 });
 
-router.put('/products/:id', authMiddleware, checkPermission('EDIT'), (req: AuthenticatedRequest, res) => {
+router.put('/products/:id', authMiddleware, checkPermission('edit_products'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const updateData = req.body;
   const db = getDb();
@@ -197,7 +289,7 @@ router.put('/products/:id', authMiddleware, checkPermission('EDIT'), (req: Authe
   res.json(updatedProduct);
 });
 
-router.delete('/products/:id', authMiddleware, checkPermission('DELETE'), (req: AuthenticatedRequest, res) => {
+router.delete('/products/:id', authMiddleware, checkPermission('delete_products'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const db = getDb();
 
@@ -219,7 +311,7 @@ router.get('/categories', (req, res) => {
   res.json(getDb().categories);
 });
 
-router.post('/categories', authMiddleware, checkPermission('ADD'), (req, res) => {
+router.post('/categories', authMiddleware, checkPermission('add_products'), (req, res) => {
   const { name, description } = req.body;
   if (!name) {
     res.status(400).json({ error: 'Vên danh mục không thể trống.' });
@@ -243,7 +335,7 @@ router.get('/imports', (req, res) => {
   res.json(getDb().imports);
 });
 
-router.post('/imports', authMiddleware, (req: AuthenticatedRequest, res) => {
+router.post('/imports', authMiddleware, checkPermission('add_imports'), (req: AuthenticatedRequest, res) => {
   const { supplierId, items, notes } = req.body;
   const db = getDb();
 
@@ -304,7 +396,7 @@ router.get('/exports', (req, res) => {
   res.json(getDb().exports);
 });
 
-router.post('/exports', authMiddleware, (req: AuthenticatedRequest, res) => {
+router.post('/exports', authMiddleware, checkPermission('add_exports'), (req: AuthenticatedRequest, res) => {
   const { customerId, items, notes } = req.body;
   const db = getDb();
 
@@ -372,7 +464,7 @@ router.post('/exports', authMiddleware, (req: AuthenticatedRequest, res) => {
 });
 
 // Admin approves shipping/exporting and triggers inventory decrements, or cancels orders
-router.put('/exports/:id/status', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.put('/exports/:id/status', authMiddleware, checkPermission('approve_exports'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const { status } = req.body; // 'SHIPPED' or 'CANCELLED' or 'PENDING'
   const db = getDb();
@@ -457,7 +549,7 @@ router.get('/warehouses', (req, res) => {
   res.json(getDb().warehouses);
 });
 
-router.post('/warehouses', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses', authMiddleware, checkPermission('add_products'), (req: AuthenticatedRequest, res) => {
   const { name, location, managerId } = req.body;
   if (!name || !location) {
     res.status(400).json({ error: 'Nhập tên kho và địa chỉ giao hợp lệ.' });
@@ -481,7 +573,7 @@ router.get('/mutations', authMiddleware, (req, res) => {
   res.json(getDb().mutations);
 });
 
-router.post('/warehouses/transfer', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses/transfer', authMiddleware, checkPermission('add_imports'), (req: AuthenticatedRequest, res) => {
   const { fromWarehouseId, toWarehouseId, productId, quantity, notes } = req.body;
   const db = getDb();
 
@@ -526,7 +618,7 @@ router.get('/stocktakes', authMiddleware, (req, res) => {
   res.json(getDb().stocktakes);
 });
 
-router.post('/warehouses/stocktake', authMiddleware, checkPermission('ADD'), (req: AuthenticatedRequest, res) => {
+router.post('/warehouses/stocktake', authMiddleware, checkPermission('add_imports'), (req: AuthenticatedRequest, res) => {
   const { warehouseId, items, notes } = req.body;
   const db = getDb();
 
@@ -587,7 +679,7 @@ router.post('/warehouses/stocktake', authMiddleware, checkPermission('ADD'), (re
 // 7. PARTNERS - CLIENTS & SUPPLIERS CRUD
 // ==========================================
 router.get('/customers', (req, res) => res.json(getDb().customers));
-router.post('/customers', authMiddleware, (req, res) => {
+router.post('/customers', authMiddleware, checkPermission('add_edit_customers'), (req, res) => {
   const cust: Partial<Customer> = req.body;
   if (!cust.name) {
     res.status(400).json({ error: 'Tên đối tác không được trống.' });
@@ -609,7 +701,7 @@ router.post('/customers', authMiddleware, (req, res) => {
 });
 
 router.get('/suppliers', (req, res) => res.json(getDb().suppliers));
-router.post('/suppliers', authMiddleware, checkPermission('ADD'), (req, res) => {
+router.post('/suppliers', authMiddleware, checkPermission('add_edit_suppliers'), (req, res) => {
   const sup: Partial<Supplier> = req.body;
   if (!sup.name) {
     res.status(400).json({ error: 'Tên nhà cung cấp không thể trống.' });
@@ -636,7 +728,7 @@ router.get('/employees', authMiddleware, (req, res) => {
   res.json(getDb().employees);
 });
 
-router.post('/employees', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+router.post('/employees', authMiddleware, checkPermission('manage_employees'), (req, res) => {
   const emp: Partial<Employee> = req.body;
   if (!emp.name || !emp.role) {
     res.status(400).json({ error: 'Vui lòng cung cấp Tên nhân sự và chức danh ERP.' });
@@ -657,7 +749,7 @@ router.post('/employees', authMiddleware, roleMiddleware(['ADMIN']), (req, res) 
   res.status(201).json(newEmp);
 });
 
-router.put('/employees/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.put('/employees/:id', authMiddleware, checkPermission('manage_employees'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const updateData = req.body;
   const db = getDb();
@@ -693,7 +785,7 @@ router.get('/users', authMiddleware, (req, res) => {
   res.json(safeUsers);
 });
 
-router.put('/users/:id/permissions', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.put('/users/:id/permissions', authMiddleware, checkPermission('manage_employees'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const { permissions, status, role } = req.body;
   const db = getDb();
@@ -710,9 +802,22 @@ router.put('/users/:id/permissions', authMiddleware, roleMiddleware(['ADMIN']), 
 
   if (permissions !== undefined) {
     updatedUser.permissions = {
-      canAdd: !!permissions.canAdd,
-      canEdit: !!permissions.canEdit,
-      canDelete: !!permissions.canDelete
+      view_products: !!permissions.view_products,
+      add_products: !!permissions.add_products,
+      edit_products: !!permissions.edit_products,
+      delete_products: !!permissions.delete_products,
+      view_imports: !!permissions.view_imports,
+      add_imports: !!permissions.add_imports,
+      view_exports: !!permissions.view_exports,
+      add_exports: !!permissions.add_exports,
+      approve_exports: !!permissions.approve_exports,
+      view_customers: !!permissions.view_customers,
+      add_edit_customers: !!permissions.add_edit_customers,
+      view_suppliers: !!permissions.view_suppliers,
+      add_edit_suppliers: !!permissions.add_edit_suppliers,
+      view_employees: !!permissions.view_employees,
+      manage_employees: !!permissions.manage_employees,
+      manage_settings: !!permissions.manage_settings
     };
   }
   
@@ -721,8 +826,8 @@ router.put('/users/:id/permissions', authMiddleware, roleMiddleware(['ADMIN']), 
   }
 
   if (role !== undefined) {
-    // Only allow ADMIN or CLIENT
-    if (role === 'ADMIN' || role === 'CLIENT') {
+    const validRoles = ['SUPER_ADMIN', 'MANAGER', 'STOCKKEEPER', 'SALES', 'VIEWER', 'ADMIN', 'CLIENT'];
+    if (validRoles.includes(role)) {
       updatedUser.role = role;
     }
   }
@@ -836,18 +941,18 @@ router.put('/notifications/mark-all', authMiddleware, (req, res) => {
 });
 
 // Logs fetch for audit trails
-router.get('/logs', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+router.get('/logs', authMiddleware, checkPermission('manage_settings'), (req, res) => {
   res.json(getDb().logs);
 });
 
 // ==========================================
 // 11. API KEYS MANAGEMENT
 // ==========================================
-router.get('/apikeys', authMiddleware, roleMiddleware(['ADMIN']), (req, res) => {
+router.get('/apikeys', authMiddleware, checkPermission('manage_settings'), (req, res) => {
   res.json(getDb().apiKeys || []);
 });
 
-router.post('/apikeys', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/apikeys', authMiddleware, checkPermission('manage_settings'), (req: AuthenticatedRequest, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || name.trim() === '') {
     res.status(400).json({ error: 'Vui lòng cung cấp tên gợi nhớ cho API Key.' });
@@ -878,7 +983,7 @@ router.post('/apikeys', authMiddleware, roleMiddleware(['ADMIN']), (req: Authent
   res.status(201).json(newKey);
 });
 
-router.post('/apikeys/:id/toggle', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.post('/apikeys/:id/toggle', authMiddleware, checkPermission('manage_settings'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const db = getDb();
   if (!db.apiKeys) db.apiKeys = [];
@@ -901,7 +1006,7 @@ router.post('/apikeys/:id/toggle', authMiddleware, roleMiddleware(['ADMIN']), (r
   res.json(foundKey);
 });
 
-router.delete('/apikeys/:id', authMiddleware, roleMiddleware(['ADMIN']), (req: AuthenticatedRequest, res) => {
+router.delete('/apikeys/:id', authMiddleware, checkPermission('manage_settings'), (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const db = getDb();
   if (!db.apiKeys) db.apiKeys = [];
