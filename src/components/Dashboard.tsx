@@ -6,19 +6,22 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Boxes, TrendingUp, AlertTriangle, ArrowDownLeft, 
-  ArrowUpRight, DollarSign, RefreshCw, FileText, Activity 
+  ArrowUpRight, DollarSign, RefreshCw, FileText, Activity, AlertCircle
 } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts';
 import { formatCurrency, formatDate } from '../utils';
 
 interface ClientStatsProps {
   stats: any;
   user: any;
   logs: any[];
+  products?: any[];
+  categories?: any[];
   onRefresh: () => void;
   onNavigate: (tab: string) => void;
 }
 
-export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: ClientStatsProps) {
+export default function Dashboard({ stats, user, logs, products = [], categories = [], onRefresh, onNavigate }: ClientStatsProps) {
   const [timeStr, setTimeStr] = useState(new Date().toLocaleTimeString('vi-VN'));
 
   useEffect(() => {
@@ -27,6 +30,42 @@ export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: 
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Pre-process categories and products to find stock levels and minimum stock levels per category
+  const categoryStockData = categories.map(cat => {
+    const catProducts = products.filter(p => p.categoryId === cat.id);
+    const totalStock = catProducts.reduce((sum, p) => sum + (p.stock || 0), 0);
+    const totalMinStock = catProducts.reduce((sum, p) => sum + (p.minStock || 0), 0);
+    const lowStockCount = catProducts.filter(p => p.stock <= p.minStock).length;
+    
+    return {
+      id: cat.id,
+      name: cat.name,
+      'Tồn Kho Thực Tế': totalStock,
+      'Hạn Mức Tối Thiểu': totalMinStock,
+      'Sản Phẩm Cảnh Báo': lowStockCount,
+      totalCount: catProducts.length,
+      products: catProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        stock: p.stock,
+        minStock: p.minStock,
+        unit: p.unit
+      }))
+    };
+  });
+
+  const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
+
+  // Auto-select first category once data populates
+  useEffect(() => {
+    if (categoryStockData.length > 0 && !selectedCatId) {
+      setSelectedCatId(categoryStockData[0].id);
+    }
+  }, [categories, products]);
+
+  const activeCategory = categoryStockData.find(c => c.id === selectedCatId) || categoryStockData[0];
 
   if (!stats) {
     return (
@@ -294,7 +333,7 @@ export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: 
                   <Activity className="h-4 w-4" />
                   <span>SỰ KIỆN GẦN ĐÂY</span>
                 </div>
-                {user?.role === 'ADMIN' && (
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
                   <span className="text-[10px] font-bold text-slate-400">LOG TRUY VẾT</span>
                 )}
               </div>
@@ -323,6 +362,221 @@ export default function Dashboard({ stats, user, logs, onRefresh, onNavigate }: 
         </div>
 
       </div>
+
+      {/* Visualizing product stock levels by category widget (using Recharts) */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-6 text-left">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-50 dark:border-slate-800 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Boxes className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Thống Kê Tồn Kho Theo Khung Danh Mục</h2>
+            </div>
+            <p className="text-xs text-slate-405 dark:text-slate-400">
+              Trực quan hóa lượng tồn thực tế so với định mức an toàn tối thiểu. Click chọn từng cột danh mục để kiểm tra chi tiết danh sách sản phẩm.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+              <span className="h-3 w-3 rounded bg-blue-600"></span> Tồn Thực Tế
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+              <span className="h-3 w-3 rounded bg-slate-300 dark:bg-slate-700"></span> Định Mức Tối Thiểu
+            </span>
+          </div>
+        </div>
+
+        {categoryStockData.length === 0 ? (
+          <div className="py-12 text-center text-slate-400 text-xs italic">
+            Chưa có thông tin danh mục hoặc dữ liệu sản phẩm trong kho.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Left side: Recharts Bar Chart */}
+            <div className="lg:col-span-7 space-y-2">
+              <div className="h-[340px] w-full text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={categoryStockData}
+                    margin={{ top: 20, right: 10, left: -20, bottom: 5 }}
+                    onClick={(state: any) => {
+                      if (state && state.activePayload && state.activePayload.length) {
+                        const clickedId = state.activePayload[0].payload.id;
+                        setSelectedCatId(clickedId);
+                      }
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" className="dark:hidden" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" className="hidden dark:block" />
+                    <XAxis 
+                      dataKey="name" 
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }}
+                    />
+                    <YAxis 
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ fill: '#64748b', fontSize: 10 }}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(148, 163, 184, 0.05)' }} 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const pData = payload[0].payload;
+                          const lowCount = pData['Sản Phẩm Cảnh Báo'];
+                          return (
+                            <div className="bg-white dark:bg-slate-950 p-4 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl space-y-2 min-w-[200px]">
+                              <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">{label}</span>
+                              <div className="border-t border-slate-50 dark:border-slate-850 pt-2 space-y-1.5 text-xs text-left">
+                                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                                  <span>Tồn Thực Tế:</span>
+                                  <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">{payload[0].value?.toLocaleString('vi-VN')}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                                  <span>Định Mức Tối Thiểu:</span>
+                                  <span className="font-bold text-slate-700 dark:text-slate-350 font-mono">{payload[1].value?.toLocaleString('vi-VN')}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-450 text-[10px]">
+                                  <span>Số lượng mặt hàng:</span>
+                                  <span className="font-bold font-mono">{pData.totalCount}</span>
+                                </div>
+                                {lowCount > 0 && (
+                                  <div className="mt-2 text-[10px] text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded-lg font-black flex items-center gap-1.5 uppercase">
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                                    <span>{lowCount} mặt hàng dưới mức tối thiểu!</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar 
+                      dataKey="Tồn Kho Thực Tế" 
+                      radius={[4, 4, 0, 0]}
+                      cursor="pointer"
+                    >
+                      {categoryStockData.map((entry, index) => {
+                        const hasAlert = entry['Sản Phẩm Cảnh Báo'] > 0;
+                        const isSelected = entry.id === selectedCatId;
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={hasAlert ? '#ef4444' : isSelected ? '#1d4ed8' : '#3b82f6'} 
+                            fillOpacity={isSelected ? 1 : 0.8}
+                          />
+                        );
+                      })}
+                    </Bar>
+                    <Bar 
+                      dataKey="Hạn Mức Tối Thiểu" 
+                      radius={[4, 4, 0, 0]}
+                      fill="#94a3b8" 
+                      fillOpacity={0.3}
+                      cursor="pointer"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] text-slate-450 italic text-center">
+                * Cột <span className="text-red-500 font-bold">Màu Đỏ</span> thể hiện danh mục đang có sản phẩm bị chạm/vượt ngưỡng tối thiểu. Chọn danh mục để xem chi tiết.
+              </div>
+            </div>
+
+            {/* Right side: Selected Category Inspector Details */}
+            <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-950/20 rounded-2xl border border-slate-100 dark:border-slate-800/85 p-5 flex flex-col justify-between">
+              {activeCategory ? (
+                <div className="space-y-4">
+                  {/* Category Title & Quick Summary */}
+                  <div className="flex items-start justify-between border-b border-slate-205 dark:border-slate-800/50 pb-3">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wide">
+                        {activeCategory.name}
+                      </h3>
+                      <p className="text-[10px] text-slate-450 mt-0.5">
+                        Tổng số lượng: {activeCategory.totalCount} mặt hàng hiện hữu
+                      </p>
+                    </div>
+
+                    {activeCategory['Sản Phẩm Cảnh Báo'] > 0 ? (
+                      <span className="flex items-center gap-1 text-[10px] bg-red-105 dark:bg-red-950/55 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-bold px-2 py-0.5 rounded-lg uppercase animate-pulse">
+                        <AlertTriangle className="h-3 w-3" />
+                        {activeCategory['Sản Phẩm Cảnh Báo']} Cảnh báo
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-lg uppercase">
+                        ✓ An toàn
+                      </span>
+                    )}
+                  </div>
+
+                  {/* List of Products in this Category */}
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 text-left">
+                    {activeCategory.products.length === 0 ? (
+                      <div className="text-xs text-slate-400 text-center py-10 italic">
+                        Không có sản phẩm nào thuộc danh mục này.
+                      </div>
+                    ) : (
+                      activeCategory.products.map((p: any) => {
+                        const isLow = p.stock <= p.minStock;
+                        return (
+                          <div 
+                            key={p.id} 
+                            className={`p-3 rounded-xl border transition-all text-xs flex justify-between items-center ${
+                              isLow 
+                                ? 'bg-red-500/5 dark:bg-red-500/10 border-red-205 dark:border-red-900/60' 
+                                : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800/80 hover:border-slate-200'
+                            }`}
+                          >
+                            <div className="space-y-0.5 max-w-[200px]">
+                              <span className="font-bold text-slate-850 dark:text-slate-100 block truncate" title={p.name}>
+                                {p.name}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400 block">
+                                Mã: {p.code} • ĐVT: {p.unit}
+                              </span>
+                            </div>
+
+                            <div className="text-right space-y-1 shrink-0">
+                              <span className={`font-mono font-black text-xs block ${isLow ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                Tồn: {p.stock}
+                              </span>
+                              <span className="text-[9px] font-medium text-slate-400 block font-mono">
+                                ĐM tối thiểu: {p.minStock}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-400 text-center py-12">
+                  Vui lòng chọn 1 danh mục để xem chi tiết.
+                </div>
+              )}
+
+              {/* Quick actions box */}
+              {user?.role !== 'VIEWER' && activeCategory && activeCategory['Sản Phẩm Cảnh Báo'] > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-205 dark:border-slate-800/50">
+                  <button
+                    onClick={() => onNavigate('imports')}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-xl transition duration-200 shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 uppercase tracking-wide border-0"
+                  >
+                    <AlertCircle className="h-4 w-4" /> Báo cáo / Nhập kho khẩn cấp
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

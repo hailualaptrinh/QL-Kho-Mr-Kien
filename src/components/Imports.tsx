@@ -94,7 +94,7 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
           <p className="text-slate-400 text-xs">Biên bản mua sắm vật liệu, bốc bổ sung kho từ nhà cung cấp phân bổ.</p>
         </div>
         
-        {user?.role === 'ADMIN' ? (
+        {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'STOCKKEEPER' || user?.permissions?.add_imports) ? (
           <button
             id="btn-open-import-form"
             onClick={() => setIsFormOpen(!isFormOpen)}
@@ -104,7 +104,7 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
           </button>
         ) : (
           <div className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-400 font-medium px-3 py-1.5 rounded-lg border border-dashed border-slate-200">
-            * Chỉ xem danh mục (ADMIN được tạo đơn mới)
+            * Chỉ xem danh mục (Thủ kho hoặc Quản lý được tạo đơn mới)
           </div>
         )}
       </div>

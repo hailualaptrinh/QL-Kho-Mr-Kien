@@ -7,10 +7,31 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import apiRouter from './server/routes/api';
-import { initDatabase } from './server/db';
+import { initDatabase, getDb } from './server/db';
+import { sendLowStockAlertEmail } from './server/services/email';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+async function runDailyEmailAlertCheck() {
+  try {
+    const db = getDb();
+    const settings = db.emailSettings;
+    if (!settings || !settings.active || !settings.sendDailyAlerts) {
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lastSentStr = settings.lastAlertSentAt ? settings.lastAlertSentAt.split('T')[0] : '';
+
+    if (todayStr !== lastSentStr) {
+      console.log(`[Scheduler] Automated daily stock level scanner triggered. Today: ${todayStr}, Previous: ${lastSentStr}`);
+      await sendLowStockAlertEmail(false);
+    }
+  } catch (err) {
+    console.error('[Scheduler] Automated stock diagnostic job failing:', err);
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -18,6 +39,15 @@ async function startServer() {
 
   // Boot the local disk storage databases
   await initDatabase();
+
+  // Run initial scheduler check 15 seconds after startup, then every 1 hour
+  setTimeout(() => {
+    runDailyEmailAlertCheck().catch(err => console.error('[Scheduler] Startup check fail:', err));
+  }, 15000);
+
+  setInterval(() => {
+    runDailyEmailAlertCheck().catch(err => console.error('[Scheduler] Periodic check fail:', err));
+  }, 3600000);
 
   // Middleware for robust body request decoding
   app.use(express.json({ limit: '10mb' }));

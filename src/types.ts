@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Role = 'SUPER_ADMIN' | 'MANAGER' | 'STOCKKEEPER' | 'SALES' | 'VIEWER';
+export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'STOCKKEEPER' | 'SALES' | 'VIEWER' | 'CLIENT';
 
 export interface UserPermissions {
   view_products: boolean;
@@ -189,3 +189,36 @@ export interface PhotoReport {
   date: string;
   creatorName: string;
 }
+
+export interface EmailSettings {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  from: string;
+  active: boolean;
+  recipientOverride: string;
+  sendDailyAlerts: boolean;
+  lastAlertSentAt?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole: string;
+  content: string;
+  timestamp: string;
+  linkedOrder?: {
+    orderId: string;
+    orderCode: string;
+    orderType: 'IMPORT' | 'EXPORT';
+    status: string;
+    totalAmount: number;
+    notes?: string;
+    itemsCount: number;
+  };
+}
+

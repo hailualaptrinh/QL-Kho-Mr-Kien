@@ -143,7 +143,7 @@ export default function Warehouses({
             <Boxes className="h-4 w-4" /> Bản Phân Phối Kho Bãi
           </button>
           
-          {user?.role === 'ADMIN' && (
+          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'STOCKKEEPER') && (
             <>
               <button
                 onClick={() => {
@@ -174,7 +174,7 @@ export default function Warehouses({
           </button>
         </div>
 
-        {activeSubTab === 'status' && user?.role === 'ADMIN' && (
+        {activeSubTab === 'status' && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
           <button
             id="btn-add-warehouse"
             onClick={() => setIsNewWHOpen(!isNewWHOpen)}

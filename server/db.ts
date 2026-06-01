@@ -14,7 +14,7 @@ import {
 } from '../src/mockData';
 import { 
   User, Category, Product, Supplier, Customer, Warehouse, 
-  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey, PhotoReport 
+  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey, PhotoReport, EmailSettings, ChatMessage 
 } from '../src/types';
 
 // Support custom environment paths or Render's persistent disk mounts dynamically
@@ -54,7 +54,21 @@ export interface DatabaseSchema {
   logs: AuditLog[];
   apiKeys: ApiKey[];
   photoReports: PhotoReport[];
+  emailSettings?: EmailSettings;
+  messages?: ChatMessage[];
 }
+
+const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  host: 'smtp.ethereal.email',
+  port: 587,
+  secure: false,
+  user: '',
+  pass: '',
+  from: 'mrkien-erp-alerts@mrkien-erp.com',
+  active: false,
+  recipientOverride: 'manager@mrkien-erp.com',
+  sendDailyAlerts: false
+};
 
 let dbState: DatabaseSchema = {
   users: [],
@@ -71,7 +85,8 @@ let dbState: DatabaseSchema = {
   mutations: [],
   logs: [],
   apiKeys: [],
-  photoReports: []
+  photoReports: [],
+  messages: []
 };
 
 // Simple helper to hash strings using node:crypto (equivalent to bcrypt simulation)
@@ -161,6 +176,12 @@ export async function initDatabase() {
       if (!dbState.photoReports) {
         dbState.photoReports = [];
       }
+      if (!dbState.emailSettings) {
+        dbState.emailSettings = { ...DEFAULT_EMAIL_SETTINGS };
+      }
+      if (!dbState.messages) {
+        dbState.messages = [];
+      }
       console.log('Database loaded successfully from local file:', DB_FILE);
     } catch (e) {
       console.error('Error reading db.json, re-initializing database:', e);
@@ -187,6 +208,34 @@ function seedDatabaseInternal() {
     mutations: [...INITIAL_MUTATIONS],
     apiKeys: [],
     photoReports: [],
+    emailSettings: { ...DEFAULT_EMAIL_SETTINGS },
+    messages: [
+      {
+        id: 'msg-1',
+        senderId: 'usr-2',
+        senderName: 'Trần Quốc Bảo (Phụ tá Kho)',
+        senderRole: 'MANAGER',
+        content: 'Chào cả nhà, tôi vừa xếp xong vị trí pallet mới cho lô hàng nhập INW. Mọi người kiểm kê và cập nhật thẻ kho nhé!',
+        timestamp: new Date(Date.now() - 3600000 * 2).toISOString() // 2 hours ago
+      },
+      {
+        id: 'msg-2',
+        senderId: 'usr-3',
+        senderName: 'Nguyễn Thị Hương (Kế toán)',
+        senderRole: 'STAFF',
+        content: 'Chào anh Bảo, đơn xuất kho OUT-2026-9045 của đại lý đang ở trạng thái Chờ Duyệt. Nhờ quản trị viên xem xét số lượng tồn đủ để xuất hành không ạ.',
+        timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        linkedOrder: {
+          orderId: 'exp-1',
+          orderCode: 'OUT-2026-9045',
+          orderType: 'EXPORT',
+          status: 'PENDING',
+          totalAmount: 18500000,
+          notes: 'Đại lý HN yêu cầu xếp xe gấp trước 12h trưa',
+          itemsCount: 2
+        }
+      }
+    ],
     logs: [
       {
         id: 'log-1',

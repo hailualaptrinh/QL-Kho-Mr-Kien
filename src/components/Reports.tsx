@@ -8,7 +8,7 @@ import {
   FileText, ArrowDownLeft, ArrowUpRight, ShieldCheck, 
   Layers, ChevronRight, FileSpreadsheet, Printer,
   Camera, Upload, Plus, Trash2, Eye, Loader2, RefreshCw, X, Clock, FileImage, ClipboardCheck,
-  Cloud, Database, LogOut, CheckCircle, AlertTriangle
+  Cloud, Database, LogOut, CheckCircle, AlertTriangle, Mail, Send
 } from 'lucide-react';
 import { ImportOrder, ExportOrder, Product, Supplier, Customer, Warehouse, PhotoReport } from '../types';
 import { formatCurrency, formatDate, exportToCSV, printPDFReport } from '../utils';
@@ -30,7 +30,7 @@ interface ReportsProps {
 }
 
 export default function Reports({ imports, exports, products, suppliers, customers, warehouses = [], user, onRefresh }: ReportsProps) {
-  const [activeReport, setActiveReport] = useState<'imports' | 'exports' | 'stock' | 'photos' | 'gdrive'>('stock');
+  const [activeReport, setActiveReport] = useState<'imports' | 'exports' | 'stock' | 'photos' | 'gdrive' | 'email'>('stock');
   const [photoReports, setPhotoReports] = useState<PhotoReport[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState<boolean>(false);
   
@@ -63,6 +63,172 @@ export default function Reports({ imports, exports, products, suppliers, custome
   // Fullscreen view modal state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<PhotoReport | null>(null);
+
+  // Email alerts states & functions
+  const [emailSettings, setEmailSettings] = useState<any>({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    user: '',
+    pass: '',
+    from: 'mrkien-erp-alerts@mrkien-erp.com',
+    active: false,
+    recipientOverride: 'manager@mrkien-erp.com',
+    sendDailyAlerts: false,
+    lastAlertSentAt: ''
+  });
+  const [loadingEmailSettings, setLoadingEmailSettings] = useState<boolean>(false);
+  const [savingEmailSettings, setSavingEmailSettings] = useState<boolean>(false);
+  const [triggeringAlerts, setTriggeringAlerts] = useState<boolean>(false);
+  const [sendingTest, setSendingTest] = useState<boolean>(false);
+  const [testRecipient, setTestRecipient] = useState<string>('');
+  const [emailMessage, setEmailMessage] = useState<{ text: string, type: 'success' | 'error' | 'info', url?: string } | null>(null);
+
+  const fetchEmailSettings = async () => {
+    setLoadingEmailSettings(true);
+    try {
+      const token = localStorage.getItem('mrkien_erp_token');
+      const res = await fetch('/api/settings/email', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEmailSettings(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch email configurations', err);
+    } finally {
+      setLoadingEmailSettings(false);
+    }
+  };
+
+  const handleSaveEmailSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEmailSettings(true);
+    setEmailMessage(null);
+    try {
+      const token = localStorage.getItem('mrkien_erp_token');
+      const res = await fetch('/api/settings/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(emailSettings)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailSettings(data);
+        setEmailMessage({
+          text: 'Cấu hình cổng SMTP và điều lệ cảnh báo email tồn kho đã được lưu lại hệ thống thành công.',
+          type: 'success'
+        });
+        if (onRefresh) onRefresh();
+      } else {
+        setEmailMessage({
+          text: data.error || 'Cập nhật cấu hình thất bại.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      setEmailMessage({
+        text: 'Có lỗi xảy ra khi truyền dữ liệu tới máy chủ.',
+        type: 'error'
+      });
+    } finally {
+      setSavingEmailSettings(false);
+    }
+  };
+
+  const handleTriggerEmailAlerts = async () => {
+    setTriggeringAlerts(true);
+    setEmailMessage(null);
+    try {
+      const token = localStorage.getItem('mrkien_erp_token');
+      const res = await fetch('/api/notifications/trigger-email-alerts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.sent) {
+          setEmailMessage({
+            text: `Đã phát thành công báo cáo tồn kho yếu tới: ${data.recipients.join(', ')} (${data.productCount} sản phẩm dưới định mức).`,
+            type: 'success',
+            url: data.previewUrl
+          });
+        } else {
+          setEmailMessage({
+            text: data.error || 'Không tìm thấy sản phẩm nào chạm hoặc thấp hơn định mức tồn kho an toàn tối thiểu, hoặc cảnh báo email chưa được kích hoạt.',
+            type: 'info'
+          });
+        }
+        if (onRefresh) onRefresh();
+      } else {
+        setEmailMessage({
+          text: data.error || 'Không thể kích hoạt kết nối cảnh báo kho tự động.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      setEmailMessage({
+        text: 'Lỗi đường truyền kết nối hoặc thiết lập SMTP chưa hoàn hảo.',
+        type: 'error'
+      });
+    } finally {
+      setTriggeringAlerts(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testRecipient) {
+      setEmailMessage({ text: 'Vui lòng điền địa chỉ email hòm thư nhận thử nghiệm.', type: 'error' });
+      return;
+    }
+    setSendingTest(true);
+    setEmailMessage(null);
+    try {
+      const token = localStorage.getItem('mrkien_erp_token');
+      const res = await fetch('/api/notifications/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetEmail: testRecipient })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailMessage({
+          text: `Đã gửi thử nghiệm SMTP kết nối thành công tới ${testRecipient}! Nhấp xem hòm thư ảo bên dưới nếu bạn đang dùng Ethereal để mở xem chi tiết email vừa gửi.`,
+          type: 'success',
+          url: data.previewUrl
+        });
+      } else {
+        setEmailMessage({
+          text: data.error || 'Gửi test SMTP lỗi. Vui lòng rà soát lại thông số cổng Server Host hoặc mật khẩu.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      setEmailMessage({
+        text: 'Lỗi kết nối cổng SMTP hoặc máy chủ phản hồi chậm.',
+        type: 'error'
+      });
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeReport === 'email') {
+      fetchEmailSettings();
+    }
+  }, [activeReport]);
 
   // Image Helper: Compress and downscale uploaded or snapped photos
   const compressImage = (base64Str: string): Promise<string> => {
@@ -660,10 +826,16 @@ export default function Reports({ imports, exports, products, suppliers, custome
           >
             <Cloud className="h-3.5 w-3.5" /> Đồng Bộ Google Drive
           </button>
+          <button
+            onClick={() => setActiveReport('email')}
+            className={`px-4.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeReport === 'email' ? 'bg-blue-600 text-white shadow font-extrabold flex items-center gap-1.5' : 'text-slate-550 dark:text-slate-300 hover:text-blue-500 flex items-center gap-1.5'}`}
+          >
+            <Mail className="h-3.5 w-3.5" /> Cảnh Báo Email & SMTP
+          </button>
         </div>
 
-        {/* Master action buttons (Hidden during Photo report & Google Drive tab) */}
-        {activeReport !== 'photos' && activeReport !== 'gdrive' && (
+        {/* Master action buttons (Hidden during Photo report, Google Drive & Email tab) */}
+        {activeReport !== 'photos' && activeReport !== 'gdrive' && activeReport !== 'email' && (
           <div className="flex gap-2.5">
             <button
               id="btn-export-report-excel"
@@ -1423,6 +1595,379 @@ export default function Reports({ imports, exports, products, suppliers, custome
                       </div>
                     </div>
                   </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* EMAIL SMTP CONFIG & LOW STOCK NOTIFICATION CENTER */}
+            {activeReport === 'email' && (
+              <div className="space-y-6">
+                
+                {/* Intro Banner */}
+                <div className="bg-slate-50 dark:bg-slate-950/20 border border-slate-101 dark:border-slate-850 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      <h4 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-tight">Cổng Kiểm Soát Email Cảnh Báo Tồn Kho</h4>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+                      Thiết lập cấu hình cổng máy chủ SMTP (Gmail, Outlook hoặc Mail ảo Ethereal) để tự động hóa việc phát hành thư điện tử khẩn tới ban giám đốc khi vật tư, hàng hóa có dấu hiệu cạn kiệt dưới định mức an toàn.
+                    </p>
+                  </div>
+                  
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-bold">
+                    <span className="text-slate-400 uppercase font-bold">Hạn chế:</span>
+                    {user?.role !== 'SUPER_ADMIN' ? (
+                      <span className="text-amber-600">Chỉ Xem (Chỉ Admin cấu hình)</span>
+                    ) : (
+                      <span className="text-emerald-600">Toàn quyền cấu hình</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Email Messages Portal / Log outputs */}
+                {emailMessage && (
+                  <div className={`p-4 rounded-xl text-xs leading-relaxed transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    emailMessage.type === 'success' 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-450' 
+                      : emailMessage.type === 'error'
+                        ? 'bg-red-50 dark:bg-red-950/10 border border-red-100 dark:border-red-900/60 text-red-800 dark:text-red-450'
+                        : 'bg-blue-50 dark:bg-blue-950/15 border border-blue-100 dark:border-blue-900/60 text-blue-800 dark:text-blue-450'
+                  }`}>
+                    <div className="flex items-start gap-2.5">
+                      <div className="text-base mt-0.5">
+                        {emailMessage.type === 'success' ? '✅' : emailMessage.type === 'error' ? '❌' : 'ℹ️'}
+                      </div>
+                      <div>
+                        <p className="font-bold">{emailMessage.type === 'success' ? 'Thành công!' : emailMessage.type === 'error' ? 'Có lỗi phát sinh' : 'Lưu ý'}</p>
+                        <p className="opacity-90">{emailMessage.text}</p>
+                      </div>
+                    </div>
+                    {emailMessage.url && (
+                      <a 
+                        href={emailMessage.url} 
+                        target="_blank" 
+                        referrerPolicy="no-referrer"
+                        className="px-3.5 py-1.5 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-801 hover:bg-slate-50 text-[10px] font-extrabold rounded-lg flex items-center gap-1 shrink-0 cursor-pointer text-center"
+                      >
+                        📬 Mở xem email ảo (Ethereal Link) ↗
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Form layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Left panel edit configuration form */}
+                  <form onSubmit={handleSaveEmailSettings} className="bg-white dark:bg-slate-900 border border-slate-101 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 lg:col-span-2">
+                    <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                      <h5 className="text-xs font-black text-slate-850 dark:text-white uppercase tracking-wider">Cài đặt Tài khoản Máy chủ SMTP</h5>
+                    </div>
+
+                    {loadingEmailSettings ? (
+                      <div className="py-20 flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                        <span className="text-xs text-slate-400 font-medium font-sans">Đang tải cấu hình máy chủ...</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 font-sans">
+                        
+                        {/* Activations Switches */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          
+                          {/* Alert Master Enable Switch */}
+                          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 rounded-xl space-y-1.5 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-slate-705 dark:text-slate-200 uppercase tracking-tight">Kích hoạt Thư báo</span>
+                              <button
+                                type="button"
+                                disabled={user?.role !== 'SUPER_ADMIN'}
+                                onClick={() => setEmailSettings({ ...emailSettings, active: !emailSettings.active })}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${emailSettings.active ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                style={{ outline: 'none' }}
+                              >
+                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${emailSettings.active ? 'translate-x-4' : 'translate-x-0'}`} />
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 leading-tight">
+                              Cho phép gửi thư điện tử báo cáo vật tư khi đạt ngưỡng cảnh báo.
+                            </p>
+                          </div>
+
+                          {/* Daily Schedule Cron Switch */}
+                          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 rounded-xl space-y-1.5 animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-slate-705 dark:text-slate-200 uppercase tracking-tight">Quét Tự Động Hàng Ngày</span>
+                              <button
+                                type="button"
+                                disabled={user?.role !== 'SUPER_ADMIN'}
+                                onClick={() => setEmailSettings({ ...emailSettings, sendDailyAlerts: !emailSettings.sendDailyAlerts })}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${emailSettings.sendDailyAlerts ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                                style={{ outline: 'none' }}
+                              >
+                                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${emailSettings.sendDailyAlerts ? 'translate-x-4' : 'translate-x-0'}`} />
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 leading-tight">
+                              Máy chủ tự quét và gửi báo cáo tổng hợp duy nhất mỗi 1 ngày (24 giờ).
+                            </p>
+                          </div>
+
+                        </div>
+
+                        {/* SMTP Server & Port */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">MÁY CHỦ SMTP OUTGOING HOST</label>
+                            <input
+                              type="text"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              placeholder="Ví dụ: smtp.gmail.com"
+                              value={emailSettings.host || ''}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, host: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">CỔNG PORT</label>
+                            <input
+                              type="number"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              placeholder="587"
+                              value={emailSettings.port || 587}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, port: parseInt(e.target.value) || 587 })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {/* SSL Secure & Sender */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center pt-2">
+                          
+                          <div className="flex items-center gap-2 md:mt-4">
+                            <input
+                              type="checkbox"
+                              id="smtp-secure-checkbox"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              checked={!!emailSettings.secure}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, secure: e.target.checked })}
+                              className="h-4 w-4 text-blue-600 rounded bg-slate-50 border-slate-300 focus:ring-blue-500"
+                            />
+                            <label htmlFor="smtp-secure-checkbox" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer">SỬ DỤNG SSL/TLS (CỔNG KÍN 465)</label>
+                          </div>
+
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">ĐỊA CHỈ EMAIL GỬI ĐI (FROM ADDRESS)</label>
+                            <input
+                              type="email"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              placeholder="mrkien-erp-alerts@company.com"
+                              value={emailSettings.from || ''}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, from: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                              required
+                            />
+                          </div>
+
+                        </div>
+
+                        {/* User credentials */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">TÊN ĐĂNG NHẬP (USERNAME/LOGIN USER)</label>
+                            <input
+                              type="text"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              placeholder="tai_khoan_gui_tin@mrkien-erp.com"
+                              value={emailSettings.user || ''}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, user: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">MẬT KHẨU HOẶC APP PASSWORD</label>
+                            <input
+                              type="password"
+                              disabled={user?.role !== 'SUPER_ADMIN'}
+                              placeholder="••••••••••••••••"
+                              value={emailSettings.pass || ''}
+                              onChange={(e) => setEmailSettings({ ...emailSettings, pass: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Target Recipient Overrides */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">DANH SÁCH EMAIL NHẬN THƯ KHẨN (NGĂN CÁCH BẰNG DẤU PHẨY)</label>
+                          <input
+                            type="text"
+                            disabled={user?.role !== 'SUPER_ADMIN'}
+                            placeholder="manager@mrkien-erp.com, director@mrkien-erp.com"
+                            value={emailSettings.recipientOverride || ''}
+                            onChange={(e) => setEmailSettings({ ...emailSettings, recipientOverride: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                          />
+                          <span className="text-[9px] text-slate-400 block italic leading-tight">
+                            Bỏ trống để mặc định tự động tìm thu nạp tất cả các email thành viên có vai trò <strong>MANAGER (QUẢN LÝ)</strong> hoặc <strong>SUPER_ADMIN</strong> đang kích hoạt trên hệ thống.
+                          </span>
+                        </div>
+
+                        {/* Submit settings button */}
+                        {user?.role === 'SUPER_ADMIN' && (
+                          <div className="pt-2 flex justify-end">
+                            <button
+                              type="submit"
+                              disabled={savingEmailSettings}
+                              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              {savingEmailSettings ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ClipboardCheck className="h-4 w-4" />
+                              )}
+                              Lưu Cấu Hình Mật Khẩu
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Quick Tip for Ethereal */}
+                        <div className="p-3 bg-amber-50/40 dark:bg-amber-955/5 border border-amber-200/50 dark:border-amber-900/30 rounded-xl text-[10px] text-slate-550 dark:text-slate-400 space-y-1 leading-normal">
+                          <p className="font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                            💡 Mẹo nhỏ cho môi trường Sandbox (Ethereal Email):
+                          </p>
+                          <p>
+                            Nếu bạn không muốn liên kết Gmail/SMTP gốc, hãy để trống ô <strong>Tên đăng nhập & Mật khẩu bản thể</strong> đồng thời đặt địa chỉ máy chủ mặc định là <code className="bg-white dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 dark:text-blue-400 font-mono text-[9px]">smtp.ethereal.email</code>.
+                          </p>
+                          <p>
+                            Hệ thống <strong>sẽ tự động tạo mới</strong> một hòm thư kiểm thử an toàn miễn phí tức thì và trả ra đường link xem thư trực tiếp tuyệt đẹp!
+                          </p>
+                        </div>
+
+                      </div>
+                    )}
+                  </form>
+
+                  {/* Right Column: Dynamic Diagnosis, Testing and Low-stock inventory preview */}
+                  <div className="space-y-6">
+                    
+                    {/* Diagnostic Actions */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-101 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+                      <div className="pb-3 border-b border-slate-101 dark:border-slate-800/80 flex items-center gap-2">
+                        <ArrowUpRight className="h-4 w-4 text-amber-500" />
+                        <h5 className="text-xs font-black text-slate-850 dark:text-white uppercase tracking-wider">Phòng Thử Nghiệm SMTP</h5>
+                      </div>
+
+                      <div className="space-y-4 font-sans">
+                        
+                        {/* Send Test Email Card */}
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">ĐỊA CHỈ NHẬN EMAIL TEST KIỂM THỬ</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="email"
+                              placeholder="nhan_vien_test@mrkien-erp.com"
+                              value={testRecipient}
+                              onChange={(e) => setTestRecipient(e.target.value)}
+                              className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSendTestEmail}
+                              disabled={sendingTest}
+                              className="px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              {sendingTest ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5" />
+                              )}
+                              Gửi test
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-3" />
+
+                        {/* Trigger Manual Scan broadcast */}
+                        <div className="space-y-2">
+                          <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Phát động quét hệ thống và gửi khẩn</h6>
+                          <button
+                            type="button"
+                            onClick={handleTriggerEmailAlerts}
+                            disabled={triggeringAlerts}
+                            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow active:scale-95 transition cursor-pointer disabled:opacity-50 font-extrabold"
+                          >
+                            {triggeringAlerts ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-white" />
+                            )}
+                            BẮT QUÉT & PHÁT THƯ NGAY
+                          </button>
+                          <span className="text-[9px] text-slate-400 block text-center italic leading-tight">
+                            Yêu cầu máy chủ quét kiểm kê tức khắc tất cả các mặt hàng chạm ngưỡng nguy hiểm, đóng tệp email HTML gửi tới các hòm thư quản lý.
+                          </span>
+                        </div>
+
+                        {/* Display Timestamp and stats info */}
+                        <div className="bg-slate-50 dark:bg-slate-950/20 rounded-xl p-3 border border-slate-150 dark:border-slate-850 text-[10px] space-y-1">
+                          <p className="text-slate-450 uppercase tracking-wide font-extrabold">Lịch sử tự động gần nhất: </p>
+                          <p className="font-extrabold font-mono text-slate-700 dark:text-slate-200">
+                            {emailSettings.lastAlertSentAt ? new Date(emailSettings.lastAlertSentAt).toLocaleString('vi-VN') : 'Chưa thu nhận lịch sử quét'}
+                          </p>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Quick list of items failing minimum stock limits right now */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-101 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                      <div className="pb-2 border-b border-slate-101 dark:border-slate-800/80 flex justify-between items-center">
+                        <h5 className="text-xs font-black text-slate-850 dark:text-white uppercase tracking-wider">Danh Sách Báo Động Mặt Hàng Yếu</h5>
+                        <span className="px-2 py-0.5 text-[9px] font-black bg-red-50 dark:bg-red-955/50 border border-red-150 dark:border-red-900/40 text-red-650 rounded-full">
+                          {products.filter(p => p.stock <= p.minStock).length} Loại
+                        </span>
+                      </div>
+
+                      <div className="max-h-[250px] overflow-y-auto pr-1 divide-y divide-slate-100 dark:divide-slate-800/50 text-xs font-sans">
+                        {products.filter(p => p.stock <= p.minStock).length === 0 ? (
+                          <div className="py-6 text-center text-slate-400 italic">
+                            Không có sản phẩm nào chạm định mức tồn tối thiểu. Hệ thống an toàn tuyệt đối!
+                          </div>
+                        ) : (
+                          products.filter(p => p.stock <= p.minStock).map(p => {
+                            const ratio = p.stock === 0 ? 0 : Math.ceil((p.stock / p.minStock) * 100);
+                            return (
+                              <div key={p.id} className="py-2.5 flex items-center justify-between gap-2.5">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{p.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono">{p.code} • Phải trữ: {p.minStock}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-black text-slate-850 dark:text-white font-mono">{p.stock} {p.unit}</p>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                                    p.stock === 0 ? 'bg-red-50 dark:bg-red-950/20 text-red-650' : 'bg-orange-50 dark:bg-orange-950/20 text-orange-655'
+                                  }`}>
+                                    Tồn {ratio}%
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
                 </div>
 
               </div>

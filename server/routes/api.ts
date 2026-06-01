@@ -6,9 +6,10 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { getDb, saveDatabase, logActivity, addNotification } from '../db';
-import { authMiddleware, roleMiddleware, checkPermission, AuthenticatedRequest } from '../middleware/auth';
+import { authMiddleware, roleMiddleware, checkPermission, AuthenticatedRequest, getUserPermissions } from '../middleware/auth';
 import { signJWT } from '../../src/utils';
-import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey } from '../../src/types';
+import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey, ChatMessage } from '../../src/types';
+import { sendLowStockAlertEmail, sendTestEmailToRecipient } from '../services/email';
 
 const router = Router();
 
@@ -538,6 +539,15 @@ router.put('/exports/:id/status', authMiddleware, checkPermission('approve_expor
     logActivity(req.userId || 'system', 'HUỶ ĐƠN HÀNG XUẤT', `Huỷ bỏ đơn hàng xuất kho ${order.code}. Cập nhật lý do điều khiển.`);
   }
 
+  // Update status changes on linked orders inside chat messages
+  if (db.messages) {
+    db.messages.forEach(msg => {
+      if (msg.linkedOrder && msg.linkedOrder.orderId === id) {
+        msg.linkedOrder.status = order.status;
+      }
+    });
+  }
+
   saveDatabase();
   res.json(order);
 });
@@ -940,6 +950,117 @@ router.put('/notifications/mark-all', authMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
+// ==========================================
+// 10.5. EMAIL ALERTS & SMTP SETTINGS
+// ==========================================
+router.get('/settings/email', authMiddleware, checkPermission('manage_settings'), (req, res) => {
+  const db = getDb();
+  const settings = db.emailSettings || {
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    user: '',
+    pass: '',
+    from: 'mrkien-erp-alerts@mrkien-erp.com',
+    active: false,
+    recipientOverride: 'manager@mrkien-erp.com',
+    sendDailyAlerts: false
+  };
+
+  // Sanitize password before returning to client
+  const sanitized = {
+    ...settings,
+    pass: settings.pass ? '••••••••' : ''
+  };
+  res.json(sanitized);
+});
+
+router.post('/settings/email', authMiddleware, checkPermission('manage_settings'), (req: AuthenticatedRequest, res) => {
+  const db = getDb();
+  const updateData = req.body;
+
+  if (!db.emailSettings) {
+    db.emailSettings = {
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      user: '',
+      pass: '',
+      from: 'mrkien-erp-alerts@mrkien-erp.com',
+      active: false,
+      recipientOverride: 'manager@mrkien-erp.com',
+      sendDailyAlerts: false
+    };
+  }
+
+  const oldSettings = db.emailSettings;
+  const newPass = updateData.pass;
+
+  db.emailSettings = {
+    host: updateData.host ?? oldSettings.host,
+    port: Number(updateData.port ?? oldSettings.port),
+    secure: !!updateData.secure,
+    user: updateData.user ?? oldSettings.user,
+    pass: (newPass && newPass !== '••••••••') ? newPass : oldSettings.pass,
+    from: updateData.from ?? oldSettings.from,
+    active: !!updateData.active,
+    recipientOverride: updateData.recipientOverride ?? oldSettings.recipientOverride,
+    sendDailyAlerts: !!updateData.sendDailyAlerts,
+    lastAlertSentAt: oldSettings.lastAlertSentAt
+  };
+
+  saveDatabase();
+  logActivity(req.userId || 'system', 'THIẾT LẬP EMAIL', `Cấu hình cảnh báo email SMTP đã được lưu chuyển.`);
+  
+  // Return sanitized
+  res.json({
+    ...db.emailSettings,
+    pass: db.emailSettings.pass ? '••••••••' : ''
+  });
+});
+
+router.post('/notifications/trigger-email-alerts', authMiddleware, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await sendLowStockAlertEmail(true); // force send if triggered manually
+    res.json({
+      success: true,
+      sent: result.sent,
+      productCount: result.productCount,
+      recipients: result.recipients,
+      previewUrl: result.previewUrl,
+      error: result.error
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post('/notifications/test-email', authMiddleware, async (req: AuthenticatedRequest, res) => {
+  const { targetEmail } = req.body;
+  if (!targetEmail) {
+    res.status(400).json({ error: 'Vui lòng cung cấp địa chỉ email nhận kiểm thử.' });
+    return;
+  }
+
+  try {
+    const result = await sendTestEmailToRecipient(targetEmail);
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Đã gửi email thử nghiệm thành công.',
+        previewUrl: result.previewUrl
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // Logs fetch for audit trails
 router.get('/logs', authMiddleware, checkPermission('manage_settings'), (req, res) => {
   res.json(getDb().logs);
@@ -1121,6 +1242,229 @@ router.post('/backup/restore', authMiddleware, (req: AuthenticatedRequest, res) 
   );
 
   res.json({ success: true, message: 'Khôi phục dữ liệu ERP thành công dồi dào!' });
+});
+
+// ==========================================
+// 14. INTERNAL WAREHOUSE CHAT & PEER APPROVALS
+// ==========================================
+router.get('/chat', authMiddleware, (req, res) => {
+  const db = getDb();
+  res.json(db.messages || []);
+});
+
+router.post('/chat', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const { content, linkedOrderId, linkedOrderType } = req.body;
+  if (!content || typeof content !== 'string' || content.trim() === '') {
+    res.status(400).json({ error: 'Nội dung tin nhắn không thể để trống.' });
+    return;
+  }
+
+  const db = getDb();
+  const userObj = db.users.find(u => u.id === req.userId);
+  if (!userObj) {
+    res.status(404).json({ error: 'Không tìm thấy người dùng hiện tại.' });
+    return;
+  }
+
+  const newMessage: ChatMessage = {
+    id: `msg-${Date.now()}`,
+    senderId: userObj.id,
+    senderName: userObj.fullName,
+    senderRole: userObj.role,
+    senderAvatar: userObj.avatar,
+    content: content.trim(),
+    timestamp: new Date().toISOString()
+  };
+
+  if (linkedOrderId && linkedOrderType) {
+    if (linkedOrderType === 'EXPORT') {
+      const order = db.exports.find(o => o.id === linkedOrderId);
+      if (order) {
+        newMessage.linkedOrder = {
+          orderId: order.id,
+          orderCode: order.code,
+          orderType: 'EXPORT',
+          status: order.status,
+          totalAmount: order.totalAmount,
+          notes: order.notes,
+          itemsCount: order.items.length
+        };
+      }
+    } else if (linkedOrderType === 'IMPORT') {
+      const order = db.imports.find(o => o.id === linkedOrderId);
+      if (order) {
+        newMessage.linkedOrder = {
+          orderId: order.id,
+          orderCode: order.code,
+          orderType: 'IMPORT',
+          status: order.status,
+          totalAmount: order.totalAmount,
+          notes: order.notes,
+          itemsCount: order.items.length
+        };
+      }
+    }
+  }
+
+  if (!db.messages) db.messages = [];
+  db.messages.push(newMessage);
+  saveDatabase();
+
+  res.status(201).json(newMessage);
+});
+
+router.post('/chat/approve-order', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const { orderId, orderType, action } = req.body; // action: 'APPROVE' or 'CANCEL'
+  const db = getDb();
+
+  const userObj = db.users.find(u => u.id === req.userId);
+  if (!userObj) {
+    res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
+    return;
+  }
+
+  if (orderType === 'EXPORT') {
+    const perms = getUserPermissions(userObj);
+    const hasPerm = perms.approve_exports || userObj.role === 'SUPER_ADMIN' || userObj.role === 'ADMIN' || userObj.role === 'MANAGER';
+    if (!hasPerm) {
+      res.status(403).json({ error: 'Bạn không có quyền xét duyệt đơn hàng xuất.' });
+      return;
+    }
+
+    const order = db.exports.find(o => o.id === orderId);
+    if (!order) {
+      res.status(404).json({ error: 'Không tìm thấy đơn xuất kho.' });
+      return;
+    }
+
+    const targetStatus = action === 'APPROVE' ? 'SHIPPED' : 'CANCELLED';
+
+    if (order.status === targetStatus) {
+      res.status(400).json({ error: 'Đơn hàng đã ở trạng thái này rồi.' });
+      return;
+    }
+
+    if (targetStatus === 'SHIPPED') {
+      let stockError = '';
+      order.items.forEach(item => {
+        const product = db.products.find(p => p.id === item.productId);
+        if (!product) return;
+        if (product.stock < item.quantity) {
+          stockError = `Sản phẩm "${product.name}" hiện không đủ tồn kho (${product.stock}/${item.quantity}) để phê duyệt xuất đơn này!`;
+        }
+      });
+
+      if (stockError) {
+        res.status(400).json({ error: stockError });
+        return;
+      }
+
+      order.items.forEach(item => {
+        const product = db.products.find(p => p.id === item.productId);
+        if (product) {
+          product.stock -= item.quantity;
+          if (product.stock < product.minStock) {
+            addNotification({
+              title: 'CẢNH BÁO TỒN KHO THẤP',
+              message: `Sản phẩm "${product.name}" vừa tụt xuống tồn ${product.stock} (định mức tối thiểu: ${product.minStock}).`,
+              type: 'warning'
+            });
+          }
+        }
+      });
+      order.status = 'SHIPPED';
+      logActivity(req.userId || 'system', 'XUẤT KHO THÀNH CÔNG', `Phê duyệt trực tiếp từ khung Chat: ${order.code}.`);
+      addNotification({
+        title: 'Đơn bốc dỡ hoàn tất',
+        message: `Đơn hàng xuất ${order.code} đã được vận chuyển xuất kho thành công qua duyệt trong khung Chat.`,
+        type: 'success'
+      });
+    } else {
+      if (order.status === 'SHIPPED') {
+        order.items.forEach(item => {
+          const product = db.products.find(p => p.id === item.productId);
+          if (product) product.stock += item.quantity;
+        });
+      }
+      order.status = 'CANCELLED';
+      logActivity(req.userId || 'system', 'HUỶ ĐƠN HÀNG XUẤT', `Huỷ đơn từ khung Chat: ${order.code}.`);
+      addNotification({
+        title: 'Đơn xuất bị huỷ',
+        message: `Đơn hàng xuất ${order.code} đã bị huỷ bỏ trực tiếp từ kênh Chat.`,
+        type: 'warning'
+      });
+    }
+
+    if (db.messages) {
+      db.messages.forEach(msg => {
+        if (msg.linkedOrder && msg.linkedOrder.orderId === orderId) {
+          msg.linkedOrder.status = order.status;
+        }
+      });
+    }
+
+    saveDatabase();
+    res.json({ success: true, status: order.status });
+    
+  } else if (orderType === 'IMPORT') {
+    const perms = getUserPermissions(userObj);
+    const hasPerm = perms.add_imports || userObj.role === 'SUPER_ADMIN' || userObj.role === 'ADMIN' || userObj.role === 'MANAGER';
+    if (!hasPerm) {
+      res.status(403).json({ error: 'Bạn không có quyền xét duyệt đơn hàng nhập.' });
+      return;
+    }
+
+    const order = db.imports.find(o => o.id === orderId);
+    if (!order) {
+      res.status(404).json({ error: 'Không tìm thấy đơn nhập kho.' });
+      return;
+    }
+
+    const targetStatus = action === 'APPROVE' ? 'COMPLETED' : 'PENDING';
+    if (order.status === targetStatus) {
+      res.status(400).json({ error: 'Đơn hàng nhập đã ở trạng thái này rồi.' });
+      return;
+    }
+
+    if (targetStatus === 'COMPLETED') {
+      order.items.forEach(item => {
+        const product = db.products.find(p => p.id === item.productId);
+        if (product) product.stock += item.quantity;
+      });
+      order.status = 'COMPLETED';
+      logActivity(req.userId || 'system', 'NHẬP KHO THÀNH CÔNG', `Phê duyệt nhập kho trực tiếp từ khung Chat: ${order.code}.`);
+      addNotification({
+        title: 'Nhập kho hoàn tất',
+        message: `Đơn nhập ${order.code} đã được xét duyệt nhập kệ gỗ thành công qua Chat.`,
+        type: 'success'
+      });
+    } else {
+      order.items.forEach(item => {
+        const product = db.products.find(p => p.id === item.productId);
+        if (product) product.stock = Math.max(0, product.stock - item.quantity);
+      });
+      order.status = 'PENDING';
+      logActivity(req.userId || 'system', 'YÊU CẦU NHẬP KHO CHỜ', `Đưa đơn hàng nhập ${order.code} về trạng thái chờ duyệt qua Chat.`);
+      addNotification({
+        title: 'Đơn chờ nhập kho',
+        message: `Đơn nhập ${order.code} vừa được điều phối về trạng thái chờ qua Chat.`,
+        type: 'warning'
+      });
+    }
+
+    if (db.messages) {
+      db.messages.forEach(msg => {
+        if (msg.linkedOrder && msg.linkedOrder.orderId === orderId) {
+          msg.linkedOrder.status = order.status;
+        }
+      });
+    }
+
+    saveDatabase();
+    res.json({ success: true, status: order.status });
+  } else {
+    res.status(400).json({ error: 'Loại đơn hàng không hợp lệ.' });
+  }
 });
 
 export default router;

@@ -311,7 +311,7 @@ export default function Exports({
                   type="submit"
                   className="px-6 py-2.5 bg-blue-605 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow cursor-pointer"
                 >
-                  Gửi yêu cầu xuất kho ({user?.role === 'ADMIN' ? 'Có thế tự duyệt ngay' : 'Đưa vào hàng hóa chờ duyệt'})
+                  Gửi yêu cầu xuất kho ({(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) ? 'Có thế tự duyệt ngay' : 'Đưa vào hàng hóa chờ duyệt'})
                 </button>
               </div>
             </div>
@@ -337,7 +337,7 @@ export default function Exports({
                 <th className="p-4 text-right">Tổng thanh toán</th>
                 <th className="p-4">Mô tả và Ghi chú</th>
                 <th className="p-4 text-center">Trạng thái</th>
-                {user?.role === 'ADMIN' && <th className="p-4 text-right">Hành động duyệt</th>}
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && <th className="p-4 text-right">Hành động duyệt</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-sm text-slate-705 dark:text-slate-300">
@@ -367,7 +367,7 @@ export default function Exports({
                       <td className="p-4 text-center">
                         {getStatusBadge(exp.status)}
                       </td>
-                      {user?.role === 'ADMIN' && (
+{(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && (
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1.5">
                             {exp.status === 'PENDING' && (
@@ -404,7 +404,7 @@ export default function Exports({
                 })
               ) : (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 8 : 7} className="p-12 text-center text-slate-405">
+                  <td colSpan={(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) ? 8 : 7} className="p-12 text-center text-slate-405">
                     <FileText className="h-10 w-10 mx-auto opacity-20 mb-3" />
                      Chưa có đơn xuất hàng bốc kho nào trong cơ sở dữ liệu.
                   </td>

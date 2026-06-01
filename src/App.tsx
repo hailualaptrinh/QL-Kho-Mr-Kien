@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, Boxes, ArrowDownLeft, ArrowUpRight, Layers, Users, Shield, 
   Settings, LogOut, Bell, Sun, Moon, Key, Check, Info, AlertOctagon, 
-  Menu, X, Lock, RefreshCw, Activity 
+  Menu, X, Lock, RefreshCw, Activity, MessageSquare 
 } from 'lucide-react';
 import { decodeJWT, formatCurrency, formatDate, signJWT } from './utils';
 import { 
@@ -71,6 +71,7 @@ if (typeof window !== 'undefined') {
 import Customers from './components/Customers';
 import Employees from './components/Employees';
 import Reports from './components/Reports';
+import Chat from './components/Chat';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('mrkien_erp_token'));
@@ -466,7 +467,7 @@ export default function App() {
       // Parallelize fetches to keep responses extremely snappy
       const [
         statsRes, prodRes, catRes, supRes, cusRes, 
-        empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes, usersRes
+        empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes, usersRes, meRes
       ] = await Promise.all([
         fetch('/api/reports/dashboard-stats', { headers }).then(r => r.json()),
         fetch('/api/products', { headers }).then(r => r.json()),
@@ -481,7 +482,8 @@ export default function App() {
         fetch('/api/logs', { headers }).then(r => r.json()),
         fetch('/api/notifications', { headers }).then(r => r.json()),
         fetch('/api/warehouses', { headers }).then(r => r.json()),
-        fetch('/api/users', { headers }).then(r => r.json())
+        fetch('/api/users', { headers }).then(r => r.json()),
+        fetch('/api/auth/me', { headers }).then(r => r.json())
       ]);
 
       setStats(statsRes);
@@ -498,6 +500,9 @@ export default function App() {
       setNotifications(notifRes || []);
       setWarehouses(whRes || []);
       setUsersList(Array.isArray(usersRes) ? usersRes : []);
+      if (meRes && meRes.user) {
+        setUser(meRes.user);
+      }
 
     } catch (e) {
       console.error('Failed to sync ERP parameters:', e);
@@ -1016,6 +1021,15 @@ export default function App() {
               </button>
             )}
 
+            <button
+              id="sidebar-nav-chat"
+              onClick={() => setActiveTab('chat')}
+              className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'chat' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
+            >
+              <MessageSquare className="h-4.5 w-4.5 text-amber-500" />
+              {isSidebarOpen && <span>Trò Chuyện & Duyệt Đơn</span>}
+            </button>
+
           </nav>
         </div>
 
@@ -1153,6 +1167,8 @@ export default function App() {
               stats={stats} 
               user={user} 
               logs={logs} 
+              products={products}
+              categories={categories}
               onRefresh={fetchAllStates} 
               onNavigate={(tab) => setActiveTab(tab)} 
             />
@@ -1243,6 +1259,16 @@ export default function App() {
               onRefresh={fetchAllStates}
             />
           )}
+
+          {activeTab === 'chat' && (
+            <Chat
+              products={products}
+              imports={imports}
+              exports={exports}
+              user={user}
+              onRefresh={fetchAllStates}
+            />
+          )}
         </main>
 
         {/* MOBILE WORKSPACE CONTROLS DOCK (Strictly responsive for touchscreen mobile size) */}
@@ -1266,6 +1292,10 @@ export default function App() {
           <button onClick={() => setActiveTab('warehouses')} className={`flex flex-col items-center gap-0.5 ${activeTab === 'warehouses' ? 'text-blue-500' : 'text-slate-400'}`}>
             <span>🏢</span>
             <span>Kho bãi</span>
+          </button>
+          <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-0.5 ${activeTab === 'chat' ? 'text-blue-500' : 'text-slate-400'}`}>
+            <span>💬</span>
+            <span>Trò chuyện</span>
           </button>
           <button onClick={handleLogout} className="flex flex-col items-center gap-0.5 text-rose-500">
             <span>🚪</span>

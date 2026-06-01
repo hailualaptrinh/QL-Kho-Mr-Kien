@@ -253,7 +253,7 @@ export default function Products({
             <FileSpreadsheet className="h-4 w-4" /> Export Excel
           </button>
 
-          {user?.role === 'ADMIN' && (
+          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.add_products) && (
             <>
               <button
                 id="btn-import-products-csv"
@@ -295,7 +295,7 @@ export default function Products({
                 </th>
                 <th className="p-4 text-center">Đơn vị</th>
                 <th className="p-4 text-center">Mã vạch / QR</th>
-                {user?.role === 'ADMIN' && <th className="p-4 text-right w-24">Hành động</th>}
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && <th className="p-4 text-right w-24">Hành động</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
@@ -356,7 +356,7 @@ export default function Products({
                           </button>
                         </div>
                       </td>
-                      {user?.role === 'ADMIN' && (
+                      {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && (
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
                             <button
@@ -381,7 +381,7 @@ export default function Products({
                 })
               ) : (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 9 : 8} className="p-12 text-center text-slate-400">
+                  <td colSpan={(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) ? 9 : 8} className="p-12 text-center text-slate-400">
                     <Package className="h-10 w-10 mx-auto opacity-20 mb-3" />
                      Không tìm thấy sản phẩm nào khớp với bộ lọc tìm kiếm.
                   </td>
