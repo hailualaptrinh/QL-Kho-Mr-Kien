@@ -7,10 +7,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileText, ArrowDownLeft, ArrowUpRight, ShieldCheck, 
   Layers, ChevronRight, FileSpreadsheet, Printer,
-  Camera, Upload, Plus, Trash2, Eye, Loader2, RefreshCw, X, Clock, FileImage, ClipboardCheck
+  Camera, Upload, Plus, Trash2, Eye, Loader2, RefreshCw, X, Clock, FileImage, ClipboardCheck,
+  Cloud, Database, LogOut, CheckCircle, AlertTriangle
 } from 'lucide-react';
 import { ImportOrder, ExportOrder, Product, Supplier, Customer, Warehouse, PhotoReport } from '../types';
 import { formatCurrency, formatDate, exportToCSV, printPDFReport } from '../utils';
+import { 
+  initGoogleOAuth, googleSignIn, googleSignOut, 
+  uploadBackupToDrive, listBackupsFromDrive, downloadBackupFromDrive, deleteFileFromDrive 
+} from '../utils/gdriveAuth';
+import { User } from 'firebase/auth';
 
 interface ReportsProps {
   imports: ImportOrder[];
@@ -20,12 +26,22 @@ interface ReportsProps {
   customers: Customer[];
   warehouses?: Warehouse[];
   user: any;
+  onRefresh?: () => void;
 }
 
-export default function Reports({ imports, exports, products, suppliers, customers, warehouses = [], user }: ReportsProps) {
-  const [activeReport, setActiveReport] = useState<'imports' | 'exports' | 'stock' | 'photos'>('stock');
+export default function Reports({ imports, exports, products, suppliers, customers, warehouses = [], user, onRefresh }: ReportsProps) {
+  const [activeReport, setActiveReport] = useState<'imports' | 'exports' | 'stock' | 'photos' | 'gdrive'>('stock');
   const [photoReports, setPhotoReports] = useState<PhotoReport[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState<boolean>(false);
+  
+  // Google Drive integrations states
+  const [gdriveUser, setGdriveUser] = useState<User | null>(null);
+  const [gdriveToken, setGdriveToken] = useState<string | null>(null);
+  const [backupsList, setBackupsList] = useState<any[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState<boolean>(false);
+  const [gdriveActionLoading, setGdriveActionLoading] = useState<boolean>(false);
+  const [gdriveMessage, setGdriveMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
+  const [backupNameInput, setBackupNameInput] = useState<string>('');
   
   // New Report Form states
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -242,6 +258,165 @@ export default function Reports({ imports, exports, products, suppliers, custome
     }
   }, [activeReport]);
 
+  // ==========================================
+  // 5. GOOGLE DRIVE BACKUP & RESTORE WORKING ACTIONS
+  // ==========================================
+  
+  // Listen to Google OAuth state
+  useEffect(() => {
+    const unsubscribe = initGoogleOAuth(
+      (user, token) => {
+        setGdriveUser(user);
+        setGdriveToken(token);
+        setGdriveMessage({ text: `Đã kết nối tài khoản Google: ${user.email}`, type: 'success' });
+      },
+      () => {
+        setGdriveUser(null);
+        setGdriveToken(null);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    setGdriveActionLoading(true);
+    setGdriveMessage(null);
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        setGdriveUser(result.user);
+        setGdriveToken(result.accessToken);
+        setGdriveMessage({ text: `Kết nối thành công! Đã cấp quyền truy cập Google Drive.`, type: 'success' });
+        fetchBackups(result.accessToken);
+      }
+    } catch (e: any) {
+      setGdriveMessage({ text: `Lỗi kết nối tài khoản Google: ${e.message || e}`, type: 'error' });
+    } finally {
+      setGdriveActionLoading(false);
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    try {
+      await googleSignOut();
+      setGdriveUser(null);
+      setGdriveToken(null);
+      setBackupsList([]);
+      setGdriveMessage({ text: 'Đã hủy kết nối Google Drive thành công.', type: 'info' });
+    } catch (e: any) {
+      setGdriveMessage({ text: `Lỗi đăng xuất: ${e.message || e}`, type: 'error' });
+    }
+  };
+
+  const fetchBackups = async (token = gdriveToken) => {
+    if (!token) return;
+    setLoadingBackups(true);
+    try {
+      const list = await listBackupsFromDrive(token);
+      setBackupsList(list);
+    } catch (e: any) {
+      setGdriveMessage({ text: `Không tải được danh sách sao lưu từ Drive: ${e.message || e}`, type: 'error' });
+    } finally {
+      setLoadingBackups(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeReport === 'gdrive' && gdriveToken) {
+      fetchBackups();
+    }
+  }, [activeReport, gdriveToken]);
+
+  const handleUploadBackup = async () => {
+    if (!gdriveToken) {
+      setGdriveMessage({ text: 'Vui lòng kết nối Google Drive trước!', type: 'error' });
+      return;
+    }
+    setGdriveActionLoading(true);
+    setGdriveMessage(null);
+    try {
+      const token = localStorage.getItem('mrkien_erp_token');
+      const res = await fetch('/api/backup/export', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Không lấy được dữ liệu xuất kho từ máy chủ.');
+      const backupPayload = await res.json();
+
+      let filename = `mrkien_erp_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      if (backupNameInput.trim()) {
+        const suffix = backupNameInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '_');
+        filename = `mrkien_erp_backup_${suffix}.json`;
+      }
+
+      const result = await uploadBackupToDrive(gdriveToken, backupPayload, filename);
+      setGdriveMessage({ text: `Tạo bản sao lưu "${filename}" & đồng bộ lên Google Drive của bạn thành công dồi dào!`, type: 'success' });
+      setBackupNameInput('');
+      fetchBackups();
+    } catch (e: any) {
+      setGdriveMessage({ text: `Lỗi tải bản sao lưu: ${e.message || e}`, type: 'error' });
+    } finally {
+      setGdriveActionLoading(false);
+    }
+  };
+
+  const handleRestoreBackup = async (fileId: string, fileName: string) => {
+    if (!gdriveToken) return;
+    const confirmRestore = window.confirm(
+      `CẢNH BÁO BẢO MẬT QUAN TRỌNG:\nBạn có chắc chắn muốn KHÔI PHỤC dồi dào toàn bộ hệ thống Quản lý kho Mr Kiên ERP từ file "${fileName}" không?\n\nToàn bộ dữ liệu hiện tại trong hệ thống (Sản phẩm, Khách hàng, Đơn bốc xếp, Báo cáo bến bãi) sẽ bị ghi đè hoàn toàn bằng dữ liệu của file sao lưu này!`
+    );
+    if (!confirmRestore) return;
+
+    setGdriveActionLoading(true);
+    setGdriveMessage(null);
+    try {
+      const googleBackupObj = await downloadBackupFromDrive(gdriveToken, fileId);
+      
+      const token = localStorage.getItem('mrkien_erp_token');
+      const response = await fetch('/api/backup/restore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ data: googleBackupObj.data || googleBackupObj })
+      });
+
+      if (response.ok) {
+        setGdriveMessage({ text: `Khôi phục dữ liệu ERP thành công! Đang đồng bộ và cập nhật lại giao diện ứng dụng...`, type: 'success' });
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        const errObj = await response.json();
+        throw new Error(errObj.error || 'Server phản đối tệp sao lưu này.');
+      }
+    } catch (e: any) {
+      setGdriveMessage({ text: `Có lỗi xảy ra khi khôi phục dữ liệu: ${e.message || e}`, type: 'error' });
+    } finally {
+      setGdriveActionLoading(false);
+    }
+  };
+
+  const handleDeleteBackup = async (fileId: string) => {
+    if (!gdriveToken) return;
+    const confirmDelete = window.confirm('Bạn muốn xóa bản sao lưu này trên Google Drive của bạn?');
+    if (!confirmDelete) return;
+
+    setGdriveActionLoading(true);
+    setGdriveMessage(null);
+    try {
+      await deleteFileFromDrive(gdriveToken, fileId);
+      setGdriveMessage({ text: 'Đã xoá thành công bản sao lưu khỏi Drive cá nhân.', type: 'info' });
+      fetchBackups();
+    } catch (e: any) {
+      setGdriveMessage({ text: `Lỗi khi xoá tệp: ${e.message || e}`, type: 'error' });
+    } finally {
+      setGdriveActionLoading(false);
+    }
+  };
+
   // Clean stream on unmount
   useEffect(() => {
     return () => {
@@ -373,7 +548,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
     <div className="space-y-6">
       
       {/* Tab selectors */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-101 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
         <div className="flex flex-wrap bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-101 dark:border-slate-850 gap-1">
           <button
             onClick={() => setActiveReport('stock')}
@@ -399,10 +574,16 @@ export default function Reports({ imports, exports, products, suppliers, custome
           >
             <Camera className="h-3.5 w-3.5" /> Báo Cáo Hình Ảnh Kho
           </button>
+          <button
+            onClick={() => setActiveReport('gdrive')}
+            className={`px-4.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeReport === 'gdrive' ? 'bg-blue-600 text-white shadow font-extrabold flex items-center gap-1.5' : 'text-slate-550 dark:text-slate-300 hover:text-blue-500 flex items-center gap-1.5'}`}
+          >
+            <Cloud className="h-3.5 w-3.5" /> Đồng Bộ Google Drive
+          </button>
         </div>
 
-        {/* Master action buttons (Hidden during Photo report tab) */}
-        {activeReport !== 'photos' && (
+        {/* Master action buttons (Hidden during Photo report & Google Drive tab) */}
+        {activeReport !== 'photos' && activeReport !== 'gdrive' && (
           <div className="flex gap-2.5">
             <button
               id="btn-export-report-excel"
@@ -811,7 +992,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
                 </div>
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="px-3.5 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-sm hover:bg-blue-750 transition"
+                  className="px-3.5 py-1.5 bg-blue-600 text-white font-bold text-xs rounded-xl flex items-center gap-1 shadow-sm hover:bg-blue-750 transition pointer-events-auto cursor-pointer"
                 >
                   <Plus className="h-4 w-4" /> Bắt đầu chụp ảnh
                 </button>
@@ -875,6 +1056,244 @@ export default function Reports({ imports, exports, products, suppliers, custome
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* 5. GOOGLE DRIVE BACKUP & RESTORE PANEL */}
+        {activeReport === 'gdrive' && (
+          <div className="p-5 space-y-6 animate-fade-in text-left">
+            {/* Header info */}
+            <div className="bg-slate-50 dark:bg-slate-950/25 p-4 rounded-2xl border border-slate-101 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <span className="px-2.5 py-1 bg-blue-100 dark:bg-blue-900/35 text-blue-700 dark:text-blue-300 text-[9px] font-black uppercase tracking-wider rounded-lg">CÔNG CỤ CLOUD SYNC</span>
+                <h4 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-tight">Sao lưu Cloud & Phục hồi hệ thống</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Đóng gói cơ sở dữ liệu kho bãi ERP, đơn bốc xếp xuất nhập và đồng bộ trực tiếp lên tài khoản cá nhân Google Drive của bạn hoàn toàn bảo mật.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {gdriveUser ? (
+                  <button
+                    onClick={handleGoogleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-55 dark:bg-red-950/20 hover:bg-red-100 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> Ngắt kết nối Google
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleGoogleLogin}
+                    disabled={gdriveActionLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-lg transition duration-200 cursor-pointer disabled:opacity-50"
+                  >
+                    {gdriveActionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-4 w-4 fill-current">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                      </svg>
+                    )}
+                    Kết nối Google Drive
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Notifications panel */}
+            {gdriveMessage && (
+              <div className={`p-3.5 rounded-xl text-xs font-bold border flex items-center gap-2.5 ${
+                gdriveMessage.type === 'success' 
+                  ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-450' 
+                  : gdriveMessage.type === 'error'
+                  ? 'bg-red-50 dark:bg-red-950/10 border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400'
+                  : 'bg-blue-50 dark:bg-blue-950/10 border-blue-100 dark:border-blue-900/50 text-blue-600 dark:text-blue-405'
+              }`}>
+                {gdriveMessage.type === 'success' ? (
+                  <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                ) : gdriveMessage.type === 'error' ? (
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+                ) : (
+                  <Cloud className="h-4 w-4 shrink-0 text-blue-500" />
+                )}
+                <span>{gdriveMessage.text}</span>
+              </div>
+            )}
+
+            {/* Main Drive Hub */}
+            {!gdriveUser ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-3xl space-y-4">
+                <Cloud className="h-10 w-10 text-slate-300 dark:text-slate-700 animate-pulse" />
+                <div className="space-y-1.5 max-w-sm">
+                  <h5 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">CHƯA LIÊN KẾT GOOGLE CLOUD</h5>
+                  <p className="text-[11px] text-slate-450 leading-relaxed">
+                    Vui lòng nhấn nút "Kết nối Google Drive" phía trên để cấp quyền lưu trữ các tệp sao lưu dữ liệu kho ERP cá nhân của bạn trực tiếp vào tài khoản Drive một cách vô cùng an toàn và bảo mật cao.
+                  </p>
+                </div>
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={gdriveActionLoading}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition cursor-pointer disabled:opacity-50"
+                >
+                  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-3.5 w-3.5 fill-current">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                  </svg>
+                  Đăng nhập & Uỷ quyền Drive
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+                
+                {/* Back up controller column */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4 lg:col-span-1">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                    <Database className="h-4 w-4 text-blue-500" />
+                    <h5 className="text-xs font-black text-slate-850 dark:text-white uppercase">Tạo bản sao lưu mới</h5>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">MÃ TÊN CHÚ THÍCH (TÙY CHỌN)</label>
+                      <input
+                        type="text"
+                        placeholder="Ví dụ: dong_so_cuoi_ky"
+                        value={backupNameInput}
+                        onChange={(e) => setBackupNameInput(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs focus:outline-none focus:border-blue-500 font-mono text-slate-850 dark:text-slate-100"
+                      />
+                      <span className="text-[9px] text-slate-400 block italic leading-tight">
+                        Tên tệp sẽ được lưu dưới dạng: <code className="text-blue-500 font-mono">mrkien_erp_backup_[tên_nhập].json</code>.
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={handleUploadBackup}
+                      disabled={gdriveActionLoading}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {gdriveActionLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Cloud className="h-3.5 w-3.5" />
+                      )}
+                      Đóng gói & Đẩy lên Cloud Drive
+                    </button>
+                  </div>
+
+                  {/* Connected Profile summary card */}
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-xl flex items-center gap-3">
+                    {gdriveUser.photoURL ? (
+                      <img src={gdriveUser.photoURL} alt="Google avatar" className="h-9 w-9 rounded-full object-cover border border-slate-200 dark:border-slate-700" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xs uppercase">
+                        {gdriveUser.displayName?.charAt(0) || 'G'}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-850 dark:text-slate-100 truncate">{gdriveUser.displayName}</p>
+                      <p className="text-[9px] text-slate-400 truncate">{gdriveUser.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Backups history List column */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4 lg:col-span-2 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="h-4 w-4 text-emerald-500" />
+                        <h5 className="text-xs font-black text-slate-850 dark:text-white uppercase tracking-tight">Bản sao lưu trên Drive của bạn</h5>
+                      </div>
+                      
+                      <button
+                        onClick={() => fetchBackups()}
+                        disabled={loadingBackups}
+                        className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[10px] font-extrabold rounded-lg flex items-center gap-1 cursor-pointer text-slate-700 dark:text-slate-200"
+                        title="Tải lại danh sách"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${loadingBackups ? 'animate-spin' : ''}`} /> Tải lại danh sách
+                      </button>
+                    </div>
+
+                    {loadingBackups && (
+                      <div className="flex flex-col items-center justify-center py-16 space-y-2">
+                        <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+                        <span className="text-[9px] text-slate-400 font-extrabold uppercase animate-pulse">ĐANG DUYỆT TỆP TRÊN GOOGLE DRIVE...</span>
+                      </div>
+                    )}
+
+                    {!loadingBackups && backupsList.length === 0 && (
+                      <div className="text-center py-12 text-slate-400 flex flex-col items-center space-y-2">
+                        <Cloud className="h-8 w-8 text-slate-305 dark:text-slate-700" />
+                        <p className="text-[11px] font-bold">Không tìm thấy tệp sao lưu ERP nào trên Drive.</p>
+                        <p className="text-[9px] text-slate-400">Hãy nhấn nút "Tạo bản sao lưu mới" bên cạnh để thực hiện sao lưu đầu tiên của bạn.</p>
+                      </div>
+                    )}
+
+                    {!loadingBackups && backupsList.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-450 tracking-wider">
+                              <th className="py-2.5">TÊN FILE</th>
+                              <th className="py-2.5">THỜI ĐIỂM SAO LƯU</th>
+                              <th className="py-2.5 text-right font-mono text-[9px]">DUNG LƯỢNG</th>
+                              <th className="py-2.5 text-right">THAO TÁC KHÔI PHỤC</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[11px]">
+                            {backupsList.map((file) => {
+                              const fileSizeKB = file.size ? `${(parseInt(file.size) / 1024).toFixed(1)} KB` : 'Có sẵn';
+                              return (
+                                <tr key={file.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
+                                  <td className="py-2.5 font-bold font-mono text-slate-800 dark:text-slate-200 break-all select-all pr-2 max-w-[200px]" title={file.name}>
+                                    {file.name}
+                                  </td>
+                                  <td className="py-2.5 text-slate-500 font-mono text-[10px]">
+                                    {formatDate(file.createdTime)}
+                                  </td>
+                                  <td className="py-2.5 text-slate-650 dark:text-slate-400 font-mono text-right text-[10px]">
+                                    {fileSizeKB}
+                                  </td>
+                                  <td className="py-2.5 text-right space-x-1.5 shrink-0 whitespace-nowrap">
+                                    <button
+                                      onClick={() => handleRestoreBackup(file.id, file.name)}
+                                      disabled={gdriveActionLoading}
+                                      className="px-2 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-[10px] font-extrabold rounded-lg inline-flex items-center gap-1 transition cursor-pointer"
+                                      title="Ghi đè database ERP cục bộ bằng dữ liệu từ bản sao lưu này"
+                                    >
+                                      Khôi phục ↺
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteBackup(file.id)}
+                                      disabled={gdriveActionLoading}
+                                      className="px-2.5 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 text-red-650 dark:text-red-400 text-[10px] font-extrabold rounded-lg inline-flex items-center gap-1 transition cursor-pointer"
+                                      title="Xóa tệp ngoài"
+                                    >
+                                      Xoá ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-slate-450 leading-relaxed bg-slate-50 dark:bg-slate-950/20 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/50 mt-4">
+                    <strong>💡 HƯỚNG DẪN ĐỒNG BỘ CLOUD:</strong> Sau khi nhấn <strong>Khôi phục</strong>, hệ thống sẽ tải bản sao lưu dữ liệu từ Google Drive của bạn xuống thiết bị, sáp nhập và ghi đè an toàn vào Database server. Dữ liệu mới sẽ được cập nhật lại ngay lập tức trên toàn bộ các màn hình mà không cần tải lại trang web hay khởi động lại thiết bị.
+                  </div>
+                </div>
+
               </div>
             )}
 

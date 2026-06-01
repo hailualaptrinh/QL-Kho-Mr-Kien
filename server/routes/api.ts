@@ -1069,4 +1069,58 @@ router.post('/photo-reports', authMiddleware, (req: AuthenticatedRequest, res) =
   res.status(201).json(newReport);
 });
 
+// ==========================================
+// 13. CLOUD BACKUP & RESTORE (SAO LƯU & KHÔI PHỤC CHO GOOGLE DRIVE)
+// ==========================================
+router.get('/backup/export', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const db = getDb();
+  // Return the entire database state except potentially the secret keys for extra security,
+  // or return everything with password fields intact so they can restore properly.
+  // We can return a copies or filtered backup. Here we return the full state with a meta stamp!
+  const backupData = {
+    version: "1.0",
+    createdAt: new Date().toISOString(),
+    exporter: req.userId || 'admin',
+    data: db
+  };
+  res.json(backupData);
+});
+
+router.post('/backup/restore', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const { data } = req.body;
+  if (!data) {
+    res.status(400).json({ error: 'Không tìm thấy dữ liệu khôi phục hợp lệ.' });
+    return;
+  }
+
+  const db = getDb();
+  
+  // Sắp xếp các danh mục và ghi đè cẩn thận để tránh mất dữ liệu
+  if (Array.isArray(data.users)) db.users = data.users;
+  if (Array.isArray(data.categories)) db.categories = data.categories;
+  if (Array.isArray(data.products)) db.products = data.products;
+  if (Array.isArray(data.suppliers)) db.suppliers = data.suppliers;
+  if (Array.isArray(data.customers)) db.customers = data.customers;
+  if (Array.isArray(data.warehouses)) db.warehouses = data.warehouses;
+  if (Array.isArray(data.employees)) db.employees = data.employees;
+  if (Array.isArray(data.notifications)) db.notifications = data.notifications;
+  if (Array.isArray(data.imports)) db.imports = data.imports;
+  if (Array.isArray(data.exports)) db.exports = data.exports;
+  if (Array.isArray(data.stocktakes)) db.stocktakes = data.stocktakes;
+  if (Array.isArray(data.mutations)) db.mutations = data.mutations;
+  if (Array.isArray(data.logs)) db.logs = data.logs;
+  if (Array.isArray(data.apiKeys)) db.apiKeys = data.apiKeys;
+  if (Array.isArray(data.photoReports)) db.photoReports = data.photoReports;
+
+  saveDatabase();
+
+  logActivity(
+    req.userId || 'admin',
+    'KHÔI PHỤC DỮ LIỆU',
+    `Đã khôi phục toàn bộ dữ liệu hệ thống từ bản sao lưu Google Drive`
+  );
+
+  res.json({ success: true, message: 'Khôi phục dữ liệu ERP thành công dồi dào!' });
+});
+
 export default router;

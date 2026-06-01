@@ -1223,6 +1223,7 @@ export default function App() {
               customers={customers}
               warehouses={warehouses}
               user={user}
+              onRefresh={fetchAllStates}
             />
           )}
         </main>
