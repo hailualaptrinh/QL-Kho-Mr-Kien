@@ -22,6 +22,35 @@ import Products from './components/Products';
 import Imports from './components/Imports';
 import Exports from './components/Exports';
 import Warehouses from './components/Warehouses';
+
+// INTERCEPT GENERAL FETCH REQUESTS FOR MOBILE DEVICES/CAPACITOR TO PREPEND CLOUD SERVER ADDRESS
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = function (input, init) {
+    let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : '';
+    if (url === '' && input && typeof input === 'object' && 'url' in (input as any)) {
+      url = (input as any).url;
+    }
+    const apiBaseUrl = localStorage.getItem('mrkien_api_base_url') || '';
+    if (url.startsWith('/api/') && apiBaseUrl) {
+      const base = apiBaseUrl.replace(/\/+$/, '');
+      const cleanUrl = url.replace(/^\/+/, '');
+      url = `${base}/${cleanUrl}`;
+      if (typeof input === 'string') {
+        input = url;
+      } else if (input instanceof URL) {
+        input = new URL(url);
+      } else if (input && typeof input === 'object' && 'url' in input) {
+        try {
+          input = new Request(url, input as RequestInit);
+        } catch (e) {
+          (input as any).url = url;
+        }
+      }
+    }
+    return originalFetch.apply(this, [input, init]);
+  };
+}
 import Customers from './components/Customers';
 import Employees from './components/Employees';
 import Reports from './components/Reports';
@@ -323,6 +352,8 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
+  const [showServerConfig, setShowServerConfig] = useState<boolean>(false);
+  const [customServerUrl, setCustomServerUrl] = useState<string>(localStorage.getItem('mrkien_api_base_url') || '');
 
   // UI state for password modal
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
@@ -779,6 +810,39 @@ export default function App() {
               {loginLoading ? 'Đang truy xuất phân quyền...' : 'Đăng nhập vào hệ thống'}
             </button>
           </form>
+
+          {/* Collapsible Server Address config details */}
+          <div className="mt-4 pt-3.5 border-t border-slate-900 flex flex-col items-center">
+            <button
+              onClick={() => setShowServerConfig(!showServerConfig)}
+              className="text-[10px] text-slate-500 hover:text-blue-400 font-extrabold flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              ⚙️ {showServerConfig ? 'Đóng cài đặt Máy chủ' : 'Cấu hình địa chỉ Máy chủ API (Điện thoại)'}
+            </button>
+
+            {showServerConfig && (
+              <div className="w-full mt-2.5 p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2 text-left animate-slide-in">
+                <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest">ĐỊA CHỈ API MÁY CHỦ CLOUD (NẾU CÓ)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: https://my-erp-server.render.com"
+                  value={customServerUrl}
+                  onChange={(e) => setCustomServerUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[11px] text-white focus:outline-none focus:border-blue-500 text-center"
+                />
+                <button
+                  onClick={() => {
+                    localStorage.setItem('mrkien_api_base_url', customServerUrl.trim());
+                    alert('Đã lưu thành công địa chỉ máy chủ API!');
+                    window.location.reload();
+                  }}
+                  className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] rounded-lg transition-all cursor-pointer"
+                >
+                  Lưu & Áp Dụng địa chỉ
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-[10px] text-slate-500">Được phân phối chính thức • Mr Kiên ERP © 2026</p>
