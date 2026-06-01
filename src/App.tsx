@@ -25,31 +25,48 @@ import Warehouses from './components/Warehouses';
 
 // INTERCEPT GENERAL FETCH REQUESTS FOR MOBILE DEVICES/CAPACITOR TO PREPEND CLOUD SERVER ADDRESS
 if (typeof window !== 'undefined') {
-  const originalFetch = window.fetch;
-  window.fetch = function (input, init) {
-    let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : '';
-    if (url === '' && input && typeof input === 'object' && 'url' in (input as any)) {
-      url = (input as any).url;
-    }
-    const apiBaseUrl = localStorage.getItem('mrkien_api_base_url') || '';
-    if (url.startsWith('/api/') && apiBaseUrl) {
-      const base = apiBaseUrl.replace(/\/+$/, '');
-      const cleanUrl = url.replace(/^\/+/, '');
-      url = `${base}/${cleanUrl}`;
-      if (typeof input === 'string') {
-        input = url;
-      } else if (input instanceof URL) {
-        input = new URL(url);
-      } else if (input && typeof input === 'object' && 'url' in input) {
-        try {
-          input = new Request(url, input as RequestInit);
-        } catch (e) {
-          (input as any).url = url;
+  try {
+    const originalFetch = window.fetch;
+    if (originalFetch) {
+      const customFetch = function (input: any, init?: any): Promise<Response> {
+        let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : '';
+        if (url === '' && input && typeof input === 'object' && 'url' in (input as any)) {
+          url = (input as any).url;
         }
+        const apiBaseUrl = localStorage.getItem('mrkien_api_base_url') || '';
+        if (url.startsWith('/api/') && apiBaseUrl) {
+          const base = apiBaseUrl.replace(/\/+$/, '');
+          const cleanUrl = url.replace(/^\/+/, '');
+          url = `${base}/${cleanUrl}`;
+          if (typeof input === 'string') {
+            input = url;
+          } else if (input instanceof URL) {
+            input = new URL(url);
+          } else if (input && typeof input === 'object' && 'url' in input) {
+            try {
+              input = new Request(url, input as RequestInit);
+            } catch (e) {
+              (input as any).url = url;
+            }
+          }
+        }
+        return originalFetch.apply(this, [input, init]);
+      };
+
+      try {
+        window.fetch = customFetch;
+      } catch (e) {
+        Object.defineProperty(window, 'fetch', {
+          value: customFetch,
+          configurable: true,
+          writable: true,
+          enumerable: true
+        });
       }
     }
-    return originalFetch.apply(this, [input, init]);
-  };
+  } catch (error) {
+    console.warn('Ngăn chặn thay đổi window.fetch trong môi trường bảo mật cao (Sandboxed iframe). Tiếp tục sử dụng hành vi fetch gốc.', error);
+  }
 }
 import Customers from './components/Customers';
 import Employees from './components/Employees';

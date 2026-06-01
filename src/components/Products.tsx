@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Product, Category, Supplier } from '../types';
 import { formatCurrency, exportToCSV } from '../utils';
+import CsvBulkImporter from './CsvBulkImporter';
 
 interface ProductsProps {
   products: Product[];
@@ -31,6 +32,7 @@ export default function Products({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isBarcodeOpen, setIsBarcodeOpen] = useState<Product | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -252,13 +254,22 @@ export default function Products({
           </button>
 
           {user?.role === 'ADMIN' && (
-            <button
-              id="btn-add-product"
-              onClick={handleOpenAddModal}
-              className="flex items-center gap-1.5 px-4.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
-            >
-              <Plus className="h-4 w-4" /> Thêm sản phẩm
-            </button>
+            <>
+              <button
+                id="btn-import-products-csv"
+                onClick={() => setShowBulkImport(true)}
+                className="flex items-center gap-1.5 px-4.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+              >
+                <Upload className="h-4 w-4" /> Nhập CSV hàng loạt
+              </button>
+              <button
+                id="btn-add-product"
+                onClick={handleOpenAddModal}
+                className="flex items-center gap-1.5 px-4.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+              >
+                <Plus className="h-4 w-4" /> Thêm sản phẩm
+              </button>
+            </>
           )}
 
         </div>
@@ -602,6 +613,17 @@ export default function Products({
             </div>
           </div>
         </div>
+      )}
+
+      {showBulkImport && (
+        <CsvBulkImporter
+          type="products"
+          categories={categories}
+          suppliers={suppliers}
+          onAdd={onAddProduct}
+          onClose={() => setShowBulkImport(false)}
+          onSuccess={onRefresh}
+        />
       )}
 
     </div>

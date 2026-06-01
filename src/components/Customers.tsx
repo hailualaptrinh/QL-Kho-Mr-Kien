@@ -4,8 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { Users, Truck, Plus, Search, Building, Phone, Mail, MapPin } from 'lucide-react';
+import { Users, Truck, Plus, Search, Building, Phone, Mail, MapPin, Upload } from 'lucide-react';
 import { Customer, Supplier } from '../types';
+import CsvBulkImporter from './CsvBulkImporter';
 
 interface CustomersProps {
   customers: Customer[];
@@ -20,6 +21,7 @@ export default function Customers({ customers, suppliers, user, onAddCustomer, o
   const [partnerType, setPartnerType] = useState<'customers' | 'suppliers'>('customers');
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // Form parameters
   const [name, setName] = useState('');
@@ -100,6 +102,15 @@ export default function Customers({ customers, suppliers, user, onAddCustomer, o
               className="pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-xl focus:outline-none border border-slate-200"
             />
           </div>
+
+          {partnerType === 'customers' && (
+            <button
+              onClick={() => setShowBulkImport(true)}
+              className="flex items-center gap-1.5 px-4.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow cursor-pointer active:scale-95"
+            >
+              <Upload className="h-4 w-4" /> Nhập CSV hàng loạt
+            </button>
+          )}
 
           <button
             onClick={handleOpenModal}
@@ -271,6 +282,15 @@ export default function Customers({ customers, suppliers, user, onAddCustomer, o
             </form>
           </div>
         </div>
+      )}
+
+      {showBulkImport && (
+        <CsvBulkImporter
+          type="customers"
+          onAdd={onAddCustomer}
+          onClose={() => setShowBulkImport(false)}
+          onSuccess={onRefresh}
+        />
       )}
 
     </div>

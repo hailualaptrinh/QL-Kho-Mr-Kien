@@ -42,6 +42,9 @@ export default function Reports({ imports, exports, products, suppliers, custome
   const [gdriveActionLoading, setGdriveActionLoading] = useState<boolean>(false);
   const [gdriveMessage, setGdriveMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
   const [backupNameInput, setBackupNameInput] = useState<string>('');
+  const [gdriveAutoSync, setGdriveAutoSync] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && localStorage.getItem('mrkien_gdrive_autosync') === 'true';
+  });
   
   // New Report Form states
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -307,6 +310,83 @@ export default function Reports({ imports, exports, products, suppliers, custome
       setGdriveMessage({ text: `Lỗi đăng xuất: ${e.message || e}`, type: 'error' });
     }
   };
+
+  const toggleAutoSync = () => {
+    const newValue = !gdriveAutoSync;
+    setGdriveAutoSync(newValue);
+    localStorage.setItem('mrkien_gdrive_autosync', String(newValue));
+    setGdriveMessage({
+      text: newValue 
+        ? 'Đã bật Tự Động Sao Lưu! Bản sao lưu "mrkien_erp_backup_autosync.json" sẽ được cập nhật âm thầm lên Google Drive của bạn khi có sự thay đổi dữ liệu.' 
+        : 'Đã tắt Tự động Sao Lưu.',
+      type: 'info'
+    });
+  };
+
+  const prevLengthsRef = useRef({
+    products: products.length,
+    imports: imports.length,
+    exports: exports.length
+  });
+
+  useEffect(() => {
+    if (!gdriveToken || !gdriveAutoSync) return;
+
+    const currentProducts = products.length;
+    const currentImports = imports.length;
+    const currentExports = exports.length;
+
+    const hasChanged = 
+      currentProducts !== prevLengthsRef.current.products ||
+      currentImports !== prevLengthsRef.current.imports ||
+      currentExports !== prevLengthsRef.current.exports;
+
+    if (hasChanged) {
+      prevLengthsRef.current = {
+        products: currentProducts,
+        imports: currentImports,
+        exports: currentExports
+      };
+
+      const runTriggeredBackup = async () => {
+        try {
+          console.log('[Auto-Sync] Initiating automatic Google Drive cloud backup sync...');
+          const token = localStorage.getItem('mrkien_erp_token');
+          const res = await fetch('/api/backup/export', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) return;
+          const backupPayload = await res.json();
+          
+          const filename = 'mrkien_erp_backup_autosync.json';
+          
+          // Try to remove old autosync files so that they don't leak space
+          try {
+            const list = await listBackupsFromDrive(gdriveToken);
+            const duplicates = list.filter(f => f.name === filename);
+            for (const dup of duplicates) {
+              await deleteFileFromDrive(gdriveToken, dup.id);
+            }
+          } catch (e) {
+            console.warn('Silent duplicate cleanup failure:', e);
+          }
+
+          await uploadBackupToDrive(gdriveToken, backupPayload, filename);
+          console.log('[Auto-Sync] Successfully synced database backup payload to Google Drive!');
+          setGdriveMessage({ text: 'Hệ thống vừa âm thầm tự động đồng bộ một bản sao lưu mới "mrkien_erp_backup_autosync.json" lên Google Drive của bạn!', type: 'success' });
+          fetchBackups(gdriveToken);
+        } catch (err) {
+          console.error('Failed to run triggered background Google Drive backup:', err);
+        }
+      };
+
+      const timer = setTimeout(() => {
+        runTriggeredBackup();
+      }, 3500); // 3.5 seconds debounce to ensure heavy batch writes are completed
+
+      return () => clearTimeout(timer);
+    }
+  }, [products.length, imports.length, exports.length, gdriveToken, gdriveAutoSync]);
 
   const fetchBackups = async (token = gdriveToken) => {
     if (!token) return;
@@ -1187,6 +1267,25 @@ export default function Reports({ imports, exports, products, suppliers, custome
                     </button>
                   </div>
 
+                  {/* Toggle Auto Sync to Google Drive */}
+                  <div className="p-3 bg-blue-50/40 dark:bg-blue-950/15 border border-blue-100/60 dark:border-blue-900/40 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-in dark:text-slate-200 uppercase tracking-tight">Tự động Cloud Sync</span>
+                      <button
+                        onClick={toggleAutoSync}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${gdriveAutoSync ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        style={{ outline: 'none' }}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${gdriveAutoSync ? 'translate-x-4' : 'translate-x-0'}`}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-slate-500/90 dark:text-slate-400 leading-tight">
+                      Khi bật, hệ thống tự động cập nhật bản sao lưu <code className="text-blue-600 dark:text-blue-400 font-semibold">mrkien_erp_backup_autosync.json</code> lên Google Drive ngay khi có phát sinh giao dịch xuất, nhập kho hoặc bốc xếp vật tư bến bãi.
+                    </p>
+                  </div>
+
                   {/* Connected Profile summary card */}
                   <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 p-3 rounded-xl flex items-center gap-3">
                     {gdriveUser.photoURL ? (
@@ -1289,8 +1388,40 @@ export default function Reports({ imports, exports, products, suppliers, custome
                     )}
                   </div>
 
-                  <div className="text-[10px] text-slate-450 leading-relaxed bg-slate-50 dark:bg-slate-950/20 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/50 mt-4">
-                    <strong>💡 HƯỚNG DẪN ĐỒNG BỘ CLOUD:</strong> Sau khi nhấn <strong>Khôi phục</strong>, hệ thống sẽ tải bản sao lưu dữ liệu từ Google Drive của bạn xuống thiết bị, sáp nhập và ghi đè an toàn vào Database server. Dữ liệu mới sẽ được cập nhật lại ngay lập tức trên toàn bộ các màn hình mà không cần tải lại trang web hay khởi động lại thiết bị.
+                  {/* Comprehensive Bento Cloud Sync Guide */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    {/* Card 1: Google Drive Recovery info */}
+                    <div className="bg-slate-50 dark:bg-slate-950/20 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-[11px] leading-relaxed relative overflow-hidden space-y-2">
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold uppercase">
+                        <Cloud className="h-4 w-4 text-blue-500" />
+                        <span>Đồng bộ Google Drive</span>
+                      </div>
+                      <p className="text-slate-650 dark:text-slate-350">
+                        • <strong>Khôi phục nhanh:</strong> Chỉ cần chọn bản sao lưu mong muốn và click nút <strong>Khôi phục</strong>. Toàn bộ hệ thống sẽ đồng bộ và cập nhật giao diện ứng dụng lập tức mà không cần tải lại trang.
+                      </p>
+                      <p className="text-slate-650 dark:text-slate-350">
+                        • <strong>Tự động Cloud Sync:</strong> Khi được bật, hệ thống sẽ tự động cập nhật bản sao lưu đám mây mới nhất <code className="bg-slate-100 dark:bg-slate-950 px-1 text-blue-505 font-mono text-[9px] rounded">mrkien_erp_backup_autosync.json</code> sau mỗi 3.5 giây khi có thay đổi bốc bãi, vật tư, giúp bạn hoàn toàn an tâm.
+                      </p>
+                    </div>
+
+                    {/* Card 2: Render configuration info */}
+                    <div className="bg-blue-55/10 dark:bg-blue-955/5 p-4 rounded-xl border border-blue-100/40 dark:border-blue-900/30 text-[11px] leading-relaxed space-y-2">
+                      <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-300 font-bold uppercase">
+                        <Database className="h-4 w-4 text-emerald-500" />
+                        <span>Bảo vệ dữ liệu gốc trên Render</span>
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-350 leading-normal">
+                        Mặc định máy chủ đám mây Render sẽ làm mới và reset file <code className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded">db.json</code> khi deploy hoặc sleep. Hãy chọn <strong>1 trong 2 giải pháp</strong> sau để dữ liệu được bảo vệ vĩnh viễn:
+                      </p>
+                      <div className="space-y-1.5 bg-white/75 dark:bg-slate-950/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-900/600">
+                        <p className="text-slate-700 dark:text-slate-300">
+                          🎯 <strong>Cách A (Miễn phí - Nên dùng nhất):</strong> Tạo một database <strong>MongoDB Atlas Cloud</strong> miễn phí, lấy chuỗi url kết nối, rồi thêm vào cài đặt Environment Variables trên Render Dashboard với tên biến: <code className="bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-mono text-[9px]">MONGODB_URI</code>. Hệ thống sẽ tự kết nối và đồng bộ.
+                        </p>
+                        <p className="text-slate-700 dark:text-slate-300 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                          💾 <strong>Cách B (Gắn ổ đĩa cứng Render Disk):</strong> Trong cài đặt Render Web Service, hãy thêm một <strong>Disk 1GB</strong>, mount tại thư mục <code className="text-emerald-600 font-mono text-[9px]">/data</code> và tạo biến môi trường <code className="bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-mono text-[9px]">DB_FILE_PATH=/data/db.json</code>.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
