@@ -2,12 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Quản lý kho Mr Kiên - ERP</title>
+    
+    <!-- PWA configuration links -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e293b" />
+    
+    <!-- Apple iOS Safari Web App support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MrKien ERP" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/583/583277.png" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Register service worker for app installation functionality -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('Service Worker registered successfully!', reg.scope))
+            .catch((err) => console.log('Service Worker compilation/register failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>
 

@@ -1,0 +1,23 @@
+{
+  "short_name": "MrKien ERP",
+  "name": "Quản lý kho Mr Kiên - ERP",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/583/583277.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/583/583277.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "display": "standalone",
+  "theme_color": "#1e293b",
+  "orientation": "portrait-primary"
+}
