@@ -1024,4 +1024,49 @@ router.delete('/apikeys/:id', authMiddleware, checkPermission('manage_settings')
   }
 });
 
+// ==========================================
+// 12. WAREHOUSE PHOTO REPORTS (BÁO CÁO HÌNH ẢNH KHO)
+// ==========================================
+router.get('/photo-reports', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const db = getDb();
+  if (!db.photoReports) db.photoReports = [];
+  res.json(db.photoReports);
+});
+
+router.post('/photo-reports', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const db = getDb();
+  if (!db.photoReports) db.photoReports = [];
+
+  const { title, warehouseId, notes, imageUrl } = req.body;
+
+  if (!title || !warehouseId || !imageUrl) {
+    res.status(400).json({ error: 'Vui lòng cung cấp đầy đủ thông tin: Tiêu đề, kho bãi và hình ảnh (chụp từ điện thoại/máy ảnh).' });
+    return;
+  }
+
+  const creator = db.users.find(u => u.id === req.userId);
+  const creatorName = creator ? creator.fullName : 'Thành viên';
+
+  const newReport = {
+    id: `rep-${Date.now()}`,
+    title,
+    warehouseId,
+    notes: notes || '',
+    imageUrl,
+    date: new Date().toISOString(),
+    creatorName
+  };
+
+  db.photoReports.unshift(newReport);
+  saveDatabase();
+
+  logActivity(
+    req.userId || 'admin',
+    'BÁO CÁO HÌNH ẢNH KHO',
+    `Đã gửi báo cáo hình ảnh kho: "${title}"`
+  );
+
+  res.status(201).json(newReport);
+});
+
 export default router;

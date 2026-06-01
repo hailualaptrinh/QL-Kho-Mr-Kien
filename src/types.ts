@@ -179,3 +179,13 @@ export interface ApiKey {
   lastUsedAt?: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
+
+export interface PhotoReport {
+  id: string;
+  title: string;
+  warehouseId: string;
+  notes: string;
+  imageUrl: string;
+  date: string;
+  creatorName: string;
+}

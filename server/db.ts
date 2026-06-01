@@ -14,7 +14,7 @@ import {
 } from '../src/mockData';
 import { 
   User, Category, Product, Supplier, Customer, Warehouse, 
-  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey 
+  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey, PhotoReport 
 } from '../src/types';
 
 // Support custom environment paths or Render's persistent disk mounts dynamically
@@ -53,6 +53,7 @@ export interface DatabaseSchema {
   mutations: StockMove[];
   logs: AuditLog[];
   apiKeys: ApiKey[];
+  photoReports: PhotoReport[];
 }
 
 let dbState: DatabaseSchema = {
@@ -69,7 +70,8 @@ let dbState: DatabaseSchema = {
   stocktakes: [],
   mutations: [],
   logs: [],
-  apiKeys: []
+  apiKeys: [],
+  photoReports: []
 };
 
 // Simple helper to hash strings using node:crypto (equivalent to bcrypt simulation)
@@ -81,8 +83,22 @@ export function hashPassword(password: string): string {
 let mongoClient: MongoClient | null = null;
 let saveTimeout: NodeJS.Timeout | null = null;
 
+function cleanMongoUri(): string | null {
+  const rawUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (!rawUri) return null;
+  let uri = rawUri.trim();
+  if ((uri.startsWith('"') && uri.endsWith('"')) || (uri.startsWith("'") && uri.endsWith("'"))) {
+    uri = uri.slice(1, -1).trim();
+  }
+  if (uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://')) {
+    return uri;
+  }
+  console.warn(`[Database] MongoDB URI "${rawUri}" is invalid or a placeholder. Bypassing cloud database and using local local db.json storage.`);
+  return null;
+}
+
 async function connectToMongo(): Promise<MongoClient | null> {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  const uri = cleanMongoUri();
   if (!uri) return null;
   if (mongoClient) return mongoClient;
   
@@ -103,7 +119,7 @@ async function connectToMongo(): Promise<MongoClient | null> {
 }
 
 export async function initDatabase() {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  const uri = cleanMongoUri();
   if (uri) {
     try {
       const client = await connectToMongo();
@@ -142,6 +158,9 @@ export async function initDatabase() {
       if (!dbState.apiKeys) {
         dbState.apiKeys = [];
       }
+      if (!dbState.photoReports) {
+        dbState.photoReports = [];
+      }
       console.log('Database loaded successfully from local file:', DB_FILE);
     } catch (e) {
       console.error('Error reading db.json, re-initializing database:', e);
@@ -167,6 +186,7 @@ function seedDatabaseInternal() {
     stocktakes: [...INITIAL_STOCKTAKES],
     mutations: [...INITIAL_MUTATIONS],
     apiKeys: [],
+    photoReports: [],
     logs: [
       {
         id: 'log-1',
@@ -194,7 +214,7 @@ async function saveToMongoBackground() {
     try {
       const client = await connectToMongo();
       if (client) {
-        const uri = process.env.MONGODB_URI || process.env.MONGO_URI || '';
+        const uri = cleanMongoUri() || '';
         const dbName = uri.split('/').pop()?.split('?')[0] || 'mrkien_erp';
         const db = client.db(dbName);
         const col = db.collection<any>('system_state');
@@ -220,8 +240,8 @@ export function saveDatabase() {
     console.error('Failed to write local backup db.json:', e);
   }
 
-  // Trigger background replication if MONGODB_URI/MONGO_URI is set
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  // Trigger background replication if MONGODB_URI/MONGO_URI is set and valid
+  const uri = cleanMongoUri();
   if (uri) {
     saveToMongoBackground().catch(err => {
       console.error('Unhandled background MongoDB save error:', err);

@@ -25,7 +25,6 @@ import Warehouses from './components/Warehouses';
 import Customers from './components/Customers';
 import Employees from './components/Employees';
 import Reports from './components/Reports';
-import ApiKeysComponent from './components/ApiKeysComponent';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('mrkien_erp_token'));
@@ -730,7 +729,7 @@ export default function App() {
             {loginError && (
               <div className="p-3 bg-red-500/10 border border-red-540/20 text-red-400 text-xs rounded-xl font-bold">
                 <div className="flex items-center gap-2">
-                  <AlertOctagon className="h-4 w-4 shrink-0" />
+                  <span className="text-xs">⚠️</span>
                   <span>{loginError}</span>
                 </div>
               </div>
@@ -744,7 +743,7 @@ export default function App() {
                   id="input-login-username"
                   type="text"
                   required
-                  placeholder="admin hoặc client..."
+                  placeholder="Nhập tên đăng nhập..."
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
                   className="w-full bg-transparent p-2.5 pl-9 text-xs text-white focus:outline-none"
@@ -755,7 +754,7 @@ export default function App() {
             <div>
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
                 <span>Mật khẩu</span>
-                <span onClick={() => alert('Mật khẩu mẫu Quản trị viên: admin123 • Khách hàng: password')} className="text-blue-450 hover:underline cursor-pointer">Quên mật khẩu?</span>
+                <span onClick={() => alert('Vui lòng liên hệ với ban quản lý Mr Kiên ERP để được hỗ trợ lại thông tin tài khoản.')} className="text-blue-450 hover:underline cursor-pointer">Quên mật khẩu?</span>
               </label>
               <div className="relative mt-1.5 rounded-xl bg-slate-900 border border-slate-800 focus-within:border-blue-500 transition-colors">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔒</span>
@@ -781,68 +780,7 @@ export default function App() {
             </button>
           </form>
 
-          {/* Preset quick buttons as requested */}
-          <div className="mt-6 pt-5 border-t border-slate-800">
-            <span className="block text-[10px] text-slate-450 font-extrabold uppercase text-center mb-3">TÀI KHOẢN TRẢI NGHIỆM NHANH</span>
-            
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button 
-                  id="btn-quick-super-admin"
-                  type="button"
-                  onClick={() => handleQuickLogin('SUPER_ADMIN')}
-                  className="p-2 py-2 bg-slate-900 hover:bg-red-500/15 text-white text-[11px] font-bold rounded-xl border border-slate-800 hover:border-red-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
-                >
-                  <span className="font-extrabold text-red-400">👑 Super Admin</span>
-                  <span className="text-[8.5px] text-slate-500 font-mono">admin / admin123</span>
-                </button>
-
-                <button 
-                  id="btn-quick-manager"
-                  type="button"
-                  onClick={() => handleQuickLogin('MANAGER')}
-                  className="p-2 py-2 bg-slate-900 hover:bg-blue-500/15 text-white text-[11px] font-bold rounded-xl border border-slate-800 hover:border-blue-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
-                >
-                  <span className="font-extrabold text-blue-400">📦 Quản lý kho</span>
-                  <span className="text-[8.5px] text-slate-500 font-mono">manager / manager123</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1.5">
-                <button 
-                  id="btn-quick-stockkeeper"
-                  type="button"
-                  onClick={() => handleQuickLogin('STOCKKEEPER')}
-                  className="p-1 py-1.5 bg-slate-900 hover:bg-emerald-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-emerald-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
-                >
-                  <span className="font-bold text-emerald-400">🔑 Thủ kho</span>
-                  <span className="text-[7.5px] text-slate-500 font-mono">kho1 / kho123</span>
-                </button>
-
-                <button 
-                  id="btn-quick-sales"
-                  type="button"
-                  onClick={() => handleQuickLogin('SALES')}
-                  className="p-1 py-1.5 bg-slate-900 hover:bg-amber-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-amber-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
-                >
-                  <span className="font-bold text-amber-400">💼 Sales</span>
-                  <span className="text-[7.5px] text-slate-500 font-mono">sales1 / sales123</span>
-                </button>
-
-                <button 
-                  id="btn-quick-viewer"
-                  type="button"
-                  onClick={() => handleQuickLogin('VIEWER')}
-                  className="p-1 py-1.5 bg-slate-900 hover:bg-slate-500/15 text-white text-[10px] font-bold rounded-xl border border-slate-800 hover:border-slate-500/30 transition-all flex flex-col items-center gap-0.5 cursor-pointer animate-none"
-                >
-                  <span className="font-bold text-slate-400">👁️ Chỉ xem</span>
-                  <span className="text-[7.5px] text-slate-500 font-mono">viewer / view123</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 text-center">
+          <div className="mt-6 text-center">
             <p className="text-[10px] text-slate-500">Được phân phối chính thức • Mr Kiên ERP © 2026</p>
           </div>
 
@@ -994,17 +932,6 @@ export default function App() {
               >
                 <Settings className="h-4.5 w-4.5" />
                 {isSidebarOpen && <span>Báo Cáo Tài Chính</span>}
-              </button>
-            )}
-
-            {hasPermission('manage_settings') && (
-              <button
-                id="sidebar-nav-apikeys"
-                onClick={() => setActiveTab('apikeys')}
-                className={`w-full p-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center gap-3 cursor-pointer ${activeTab === 'apikeys' ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-800 hover:text-white'}`}
-              >
-                <Key className="h-4.5 w-4.5 text-amber-500" />
-                {isSidebarOpen && <span>Cổng Kết Nối & API Key</span>}
               </button>
             )}
 
@@ -1230,14 +1157,8 @@ export default function App() {
               products={products}
               suppliers={suppliers}
               customers={customers}
+              warehouses={warehouses}
               user={user}
-            />
-          )}
-
-          {activeTab === 'apikeys' && (
-            <ApiKeysComponent
-              user={user}
-              onRefresh={fetchAllStates}
             />
           )}
         </main>
