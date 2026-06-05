@@ -5,7 +5,18 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
+
+// Cấu hình Firebase Client-side lưu trữ an toàn (Google Auth & Drive Backup)
+// Ưu tiên các biến môi trường của Vite, nếu thiếu sẽ fallback về cấu hình mặc định của hệ thống
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAuC_-0WEz29jKYElvVrPSDHwgsMJBFAno',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gen-lang-client-0634447609.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-client-0634447609',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'gen-lang-client-0634447609.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '177018845427',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:177018845427:web:a5c0ffa3ba586f0c0adf86',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ''
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
