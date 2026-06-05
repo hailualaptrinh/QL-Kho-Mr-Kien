@@ -19,13 +19,24 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- Register service worker for app installation functionality -->
+    <!-- Self-healing script to clear old service worker caches and prevent blank screens from stale hashes -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('Service Worker registered successfully!', reg.scope))
-            .catch((err) => console.log('Service Worker compilation/register failed:', err));
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister().then((success) => {
+              if (success) console.log('Stale service worker unregistered successfully.');
+            });
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          for (const name of names) {
+            caches.delete(name).then(() => {
+              console.log('Stale cache deleted successfully:', name);
+            });
+          }
         });
       }
     </script>
