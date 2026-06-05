@@ -29,6 +29,11 @@ export default function Exports({
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
+  const [confirmData, setConfirmData] = useState<{
+    id: string;
+    actionType: 'APPROVE' | 'CANCEL';
+    message: string;
+  } | null>(null);
 
   // Active lines
   const [lines, setLines] = useState<{ productId: string; quantity: number; price: number }[]>([
@@ -112,18 +117,18 @@ export default function Exports({
   };
 
   const handleApprove = async (id: string) => {
-    if (window.confirm('Xác nhận xuất kho hàng này? Việc này sẽ ghi trừ số lượng sản phẩm trên kệ vĩnh viễn.')) {
-      try {
-        await onUpdateExportStatus(id, 'SHIPPED');
-      } catch (err: any) {
-        alert(err.message || 'Lỗi bốc bốc xếp.');
-      }
+    try {
+      await onUpdateExportStatus(id, 'SHIPPED');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi bốc bốc xếp.');
     }
   };
 
   const handleCancel = async (id: string) => {
-    if (window.confirm('Hủy bỏ đơn bốc dỡ/yêu cầu giao hàng này?')) {
+    try {
       await onUpdateExportStatus(id, 'CANCELLED');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi huỷ bỏ.');
     }
   };
 
@@ -373,14 +378,22 @@ export default function Exports({
                             {exp.status === 'PENDING' && (
                               <>
                                 <button
-                                  onClick={() => handleApprove(exp.id)}
+                                  onClick={() => setConfirmData({
+                                    id: exp.id,
+                                    actionType: 'APPROVE',
+                                    message: 'Xác nhận xuất kho hàng này? Việc này sẽ ghi trừ số lượng sản phẩm trên kệ vĩnh viễn.'
+                                  })}
                                   className="flex items-center gap-1 p-1.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-extrabold rounded-lg transition-colors cursor-pointer"
                                   title="Phê chuẩn xếp đơn bốc lên xe"
                                 >
                                   Duyệt Xuất
                                 </button>
                                 <button
-                                  onClick={() => handleCancel(exp.id)}
+                                  onClick={() => setConfirmData({
+                                    id: exp.id,
+                                    actionType: 'CANCEL',
+                                    message: 'Hủy bỏ đơn bốc dỡ/yêu cầu giao hàng này?'
+                                  })}
                                   className="p-1.5 bg-slate-50 hover:bg-rose-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                                   title="Từ chối/Huỷ phiếu bốc"
                                 >
@@ -414,6 +427,44 @@ export default function Exports({
           </table>
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {confirmData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full border border-slate-100 dark:border-slate-800 shadow-2xl p-6 relative">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 bg-amber-100 dark:bg-amber-950/40 rounded-full flex items-center justify-center text-amber-600 dark:text-amber-450 text-xl font-bold">
+                ⚠️
+              </div>
+              <h3 className="font-bold text-slate-800 dark:text-white text-base">Xác nhận thao tác</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">{confirmData.message}</p>
+              
+              <div className="flex gap-3 pt-3">
+                <button
+                  onClick={() => setConfirmData(null)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  onClick={async () => {
+                    const { id, actionType } = confirmData;
+                    setConfirmData(null);
+                    if (actionType === 'APPROVE') {
+                      await handleApprove(id);
+                    } else {
+                      await handleCancel(id);
+                    }
+                  }}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

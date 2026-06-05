@@ -35,6 +35,7 @@ export default function Products({
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [deleteConfirmData, setDeleteConfirmData] = useState<{ id: string; name: string } | null>(null);
 
   // New product form states
   const [name, setName] = useState('');
@@ -117,9 +118,15 @@ export default function Products({
     setIsModalOpen(false);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xoá vĩnh viễn sản phẩm "${name}" khỏi ERP?`)) {
+  const handleDelete = (id: string, name: string) => {
+    setDeleteConfirmData({ id, name });
+  };
+
+  const executeDelete = async (id: string) => {
+    try {
       await onDeleteProduct(id);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi bốc xéo.');
     }
   };
 
@@ -624,6 +631,44 @@ export default function Products({
           onClose={() => setShowBulkImport(false)}
           onSuccess={onRefresh}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full border border-slate-100 dark:border-slate-800 shadow-2xl p-6 relative">
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-950/40 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 text-xl font-bold">
+                ⚠️
+              </div>
+              <h3 className="font-bold text-slate-800 dark:text-white text-base">Xác nhận xoá vĩnh viễn</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
+                Bạn có chắc chắn muốn xoá vĩnh viễn sản phẩm <strong className="text-slate-900 dark:text-white">"{deleteConfirmData.name}"</strong> khỏi hệ thống ERP? Việc này không thể phục hồi dữ liệu.
+              </p>
+              
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmData(null)}
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = deleteConfirmData.id;
+                    setDeleteConfirmData(null);
+                    await executeDelete(id);
+                  }}
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Xác nhận xoá
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

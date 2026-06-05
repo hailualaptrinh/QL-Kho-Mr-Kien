@@ -174,7 +174,7 @@ router.post('/auth/login', (req, res) => {
       phone: user.phone,
       role: user.role,
       avatar: user.avatar,
-      permissions: user.permissions
+      permissions: getUserPermissions(user)
     }
   });
 });
@@ -199,7 +199,12 @@ router.get('/auth/me', authMiddleware, (req: AuthenticatedRequest, res) => {
     res.status(404).json({ error: 'Không tìm thấy người dùng.' });
     return;
   }
-  res.json({ user });
+  res.json({ 
+    user: {
+      ...user,
+      permissions: getUserPermissions(user)
+    } 
+  });
 });
 
 // ==========================================
