@@ -148,6 +148,26 @@ export async function initDatabase() {
         if (doc) {
           const { _id, ...rest } = doc;
           dbState = { ...dbState, ...rest };
+          
+          // Secure fallbacks to protect against crashes when database version upgrades
+          if (!dbState.users) dbState.users = [];
+          if (!dbState.categories) dbState.categories = [];
+          if (!dbState.products) dbState.products = [];
+          if (!dbState.suppliers) dbState.suppliers = [];
+          if (!dbState.customers) dbState.customers = [];
+          if (!dbState.warehouses) dbState.warehouses = [];
+          if (!dbState.employees) dbState.employees = [];
+          if (!dbState.notifications) dbState.notifications = [];
+          if (!dbState.imports) dbState.imports = [];
+          if (!dbState.exports) dbState.exports = [];
+          if (!dbState.stocktakes) dbState.stocktakes = [];
+          if (!dbState.mutations) dbState.mutations = [];
+          if (!dbState.logs) dbState.logs = [];
+          if (!dbState.apiKeys) dbState.apiKeys = [];
+          if (!dbState.photoReports) dbState.photoReports = [];
+          if (!dbState.messages) dbState.messages = [];
+          if (!dbState.emailSettings) dbState.emailSettings = { ...DEFAULT_EMAIL_SETTINGS };
+
           console.log('====== MONGO DB CONFIG ======');
           console.log('👉 Loaded system database state from MongoDB Atlas cloud!');
           console.log('==============================');

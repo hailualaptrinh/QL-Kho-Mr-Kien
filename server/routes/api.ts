@@ -1258,7 +1258,7 @@ router.get('/chat', authMiddleware, (req, res) => {
 });
 
 router.post('/chat', authMiddleware, (req: AuthenticatedRequest, res) => {
-  const { content, linkedOrderId, linkedOrderType } = req.body;
+  const { content, linkedOrderId, linkedOrderType, linkedOrder } = req.body;
   if (!content || typeof content !== 'string' || content.trim() === '') {
     res.status(400).json({ error: 'Nội dung tin nhắn không thể để trống.' });
     return;
@@ -1281,9 +1281,13 @@ router.post('/chat', authMiddleware, (req: AuthenticatedRequest, res) => {
     timestamp: new Date().toISOString()
   };
 
-  if (linkedOrderId && linkedOrderType) {
-    if (linkedOrderType === 'EXPORT') {
-      const order = db.exports.find(o => o.id === linkedOrderId);
+  // Support both flat parameters or nested object sent from Chat.tsx client
+  const targetId = linkedOrderId || (linkedOrder ? linkedOrder.orderId : undefined);
+  const targetType = linkedOrderType || (linkedOrder ? linkedOrder.orderType : undefined);
+
+  if (targetId && targetType) {
+    if (targetType === 'EXPORT') {
+      const order = db.exports.find(o => o.id === targetId);
       if (order) {
         newMessage.linkedOrder = {
           orderId: order.id,
@@ -1295,8 +1299,8 @@ router.post('/chat', authMiddleware, (req: AuthenticatedRequest, res) => {
           itemsCount: order.items.length
         };
       }
-    } else if (linkedOrderType === 'IMPORT') {
-      const order = db.imports.find(o => o.id === linkedOrderId);
+    } else if (targetType === 'IMPORT') {
+      const order = db.imports.find(o => o.id === targetId);
       if (order) {
         newMessage.linkedOrder = {
           orderId: order.id,

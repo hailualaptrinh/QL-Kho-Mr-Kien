@@ -51,7 +51,23 @@ export default function Chat({ products, imports, exports, user, onRefresh }: Ch
             'Authorization': `Bearer ${localStorage.getItem('mrkien_erp_token')}`
           }
         });
-        if (!response.ok) throw new Error('Không thể tải tin nhắn.');
+        if (!response.ok) {
+          let errMsg = `Không thể tải tin nhắn (Mã lỗi HTTP: ${response.status})`;
+          try {
+            const data = await response.json();
+            if (data && data.error) {
+              errMsg = `${data.error} (HTTP ${response.status})`;
+            }
+          } catch (e1) {
+            try {
+              const txt = await response.text();
+              if (txt) {
+                errMsg = `${txt.substring(0, 80)} (HTTP ${response.status})`;
+              }
+            } catch (e2) {}
+          }
+          throw new Error(errMsg);
+        }
         const data = await response.json();
         if (active) {
           setMessages(data);
