@@ -288,21 +288,21 @@ export default function Products({
           <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 dark:bg-slate-950/40 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4 w-20">Ảnh</th>
-                <th className="p-4 cursor-pointer hover:text-slate-600 dark:hover:text-amber-450 select-none" onClick={() => toggleSort('name')}>
+                <th className="p-4 w-20 min-w-[80px]">Ảnh</th>
+                <th className="p-4 cursor-pointer hover:text-slate-600 dark:hover:text-amber-450 select-none min-w-[180px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">Sản phẩm <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4">Danh mục</th>
-                <th className="p-4 text-right">Giá nhập</th>
-                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('price')}>
+                <th className="p-4 min-w-[120px]">Danh mục</th>
+                <th className="p-4 text-right min-w-[100px]">Giá nhập</th>
+                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none min-w-[100px]" onClick={() => toggleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Giá xuất <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none" onClick={() => toggleSort('stock')}>
+                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none min-w-[110px]" onClick={() => toggleSort('stock')}>
                   <div className="flex items-center justify-end gap-1">Tồn kho <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4 text-center">Đơn vị</th>
-                <th className="p-4 text-center">Mã vạch / QR</th>
-                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && <th className="p-4 text-right w-24">Hành động</th>}
+                <th className="p-4 text-center min-w-[80px]">Đơn vị</th>
+                <th className="p-4 text-center min-w-[130px]">Mã vạch / QR</th>
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && <th className="p-4 text-right w-24 min-w-[100px]">Hành động</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
@@ -313,7 +313,7 @@ export default function Products({
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/20 text-slate-700 dark:text-slate-200 text-sm transition-colors">
-                      <td className="p-4">
+                      <td className="p-4 w-20 min-w-[80px]">
                         <img 
                           src={p.image} 
                           alt={p.name} 
@@ -321,24 +321,24 @@ export default function Products({
                           className="h-10 w-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800"
                         />
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 min-w-[180px]">
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-white line-clamp-1">{p.name}</p>
+                          <p className="font-bold text-slate-900 dark:text-white line-clamp-2 md:line-clamp-1" title={p.name}>{p.name}</p>
                           <p className="text-xs text-slate-400 font-mono mt-0.5">{p.code}</p>
                         </div>
                       </td>
-                      <td className="p-4">
-                        <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold px-2.5 py-1 rounded-full">
+                      <td className="p-4 min-w-[120px] whitespace-nowrap">
+                        <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
                           {cat}
                         </span>
                       </td>
-                      <td className="p-4 text-right font-mono font-medium text-slate-500 whitespace-nowrap">
+                      <td className="p-4 text-right font-mono font-medium text-slate-500 whitespace-nowrap min-w-[100px]">
                         {formatCurrency(p.importPrice)}
                       </td>
-                      <td className="p-4 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                      <td className="p-4 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap min-w-[100px]">
                         {formatCurrency(p.exportPrice)}
                       </td>
-                      <td className="p-4 text-right whitespace-nowrap">
+                      <td className="p-4 text-right whitespace-nowrap min-w-[110px]">
                         <div className="flex flex-col items-end">
                           <span className={`font-mono font-bold ${isLowStock ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
                             {p.stock}
@@ -350,8 +350,8 @@ export default function Products({
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-center text-xs font-semibold text-slate-500">{p.unit}</td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center text-xs font-semibold text-slate-500 min-w-[80px]">{p.unit}</td>
+                      <td className="p-4 text-center min-w-[130px]">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className="text-xs font-mono tracking-wider">{p.barcode}</span>
                           <button 
