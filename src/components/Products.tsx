@@ -12,6 +12,40 @@ import { Product, Category, Supplier } from '../types';
 import { formatCurrency, exportToCSV } from '../utils';
 import CsvBulkImporter from './CsvBulkImporter';
 
+const ProductImageFallback = ({ src, name }: { src: string; name: string }) => {
+  const [error, setError] = useState(false);
+  
+  // Clean initials builder supporting various spaces and special chars
+  const initials = name
+    ? name
+        .trim()
+        .split(/\s+/)
+        .map(n => n[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : 'SP';
+
+  if (error || !src) {
+    return (
+      <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-xs border border-blue-100/30 mx-auto select-none" title={name}>
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={src} 
+      alt={name} 
+      referrerPolicy="no-referrer"
+      onError={() => setError(true)}
+      className="h-10 w-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 mx-auto shadow-sm"
+    />
+  );
+};
+
 interface ProductsProps {
   products: Product[];
   categories: Category[];
@@ -281,28 +315,26 @@ export default function Products({
 
         </div>
       </div>
-
-      {/* Grid or table table products */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
+          <table className="w-full text-left border-collapse min-w-[1100px] lg:min-w-full">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 dark:bg-slate-950/40 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4 w-20 min-w-[80px]">Ảnh</th>
-                <th className="p-4 cursor-pointer hover:text-slate-600 dark:hover:text-amber-450 select-none min-w-[180px]" onClick={() => toggleSort('name')}>
+                <th className="p-4 w-20 text-center">Ảnh</th>
+                <th className="p-4 cursor-pointer hover:text-slate-600 dark:hover:text-amber-450 select-none min-w-[280px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">Sản phẩm <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4 min-w-[120px]">Danh mục</th>
-                <th className="p-4 text-right min-w-[100px]">Giá nhập</th>
-                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none min-w-[100px]" onClick={() => toggleSort('price')}>
+                <th className="p-4 w-44 whitespace-nowrap text-left">Danh mục</th>
+                <th className="p-4 w-36 text-right whitespace-nowrap">Giá nhập</th>
+                <th className="p-4 w-36 text-right cursor-pointer hover:text-slate-600 select-none whitespace-nowrap" onClick={() => toggleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Giá xuất <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4 text-right cursor-pointer hover:text-slate-600 select-none min-w-[110px]" onClick={() => toggleSort('stock')}>
+                <th className="p-4 w-36 text-right cursor-pointer hover:text-slate-600 select-none whitespace-nowrap" onClick={() => toggleSort('stock')}>
                   <div className="flex items-center justify-end gap-1">Tồn kho <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
-                <th className="p-4 text-center min-w-[80px]">Đơn vị</th>
-                <th className="p-4 text-center min-w-[130px]">Mã vạch / QR</th>
-                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && <th className="p-4 text-right w-24 min-w-[100px]">Hành động</th>}
+                <th className="p-4 w-24 text-center whitespace-nowrap">Đơn vị</th>
+                <th className="p-4 w-40 text-center whitespace-nowrap">Mã vạch / QR</th>
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.edit_products) && <th className="p-4 w-32 text-right whitespace-nowrap">Hành động</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
@@ -313,32 +345,27 @@ export default function Products({
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/20 text-slate-700 dark:text-slate-200 text-sm transition-colors">
-                      <td className="p-4 w-20 min-w-[80px]">
-                        <img 
-                          src={p.image} 
-                          alt={p.name} 
-                          referrerPolicy="no-referrer"
-                          className="h-10 w-10 rounded-lg object-cover bg-slate-100 dark:bg-slate-800"
-                        />
+                      <td className="p-4 w-20 text-center">
+                        <ProductImageFallback src={p.image} name={p.name} />
                       </td>
-                      <td className="p-4 min-w-[180px]">
+                      <td className="p-4 min-w-[280px]">
                         <div>
                           <p className="font-bold text-slate-900 dark:text-white line-clamp-2 md:line-clamp-1" title={p.name}>{p.name}</p>
                           <p className="text-xs text-slate-400 font-mono mt-0.5">{p.code}</p>
                         </div>
                       </td>
-                      <td className="p-4 min-w-[120px] whitespace-nowrap">
+                      <td className="p-4 w-44 whitespace-nowrap">
                         <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
                           {cat}
                         </span>
                       </td>
-                      <td className="p-4 text-right font-mono font-medium text-slate-500 whitespace-nowrap min-w-[100px]">
+                      <td className="p-4 w-36 text-right font-mono font-medium text-slate-500 whitespace-nowrap animate-fade-in">
                         {formatCurrency(p.importPrice)}
                       </td>
-                      <td className="p-4 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap min-w-[100px]">
+                      <td className="p-4 w-36 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap animate-fade-in">
                         {formatCurrency(p.exportPrice)}
                       </td>
-                      <td className="p-4 text-right whitespace-nowrap min-w-[110px]">
+                      <td className="p-4 w-36 text-right whitespace-nowrap">
                         <div className="flex flex-col items-end">
                           <span className={`font-mono font-bold ${isLowStock ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
                             {p.stock}
@@ -350,13 +377,13 @@ export default function Products({
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-center text-xs font-semibold text-slate-500 min-w-[80px]">{p.unit}</td>
-                      <td className="p-4 text-center min-w-[130px]">
+                      <td className="p-4 w-24 text-center text-xs font-semibold text-slate-500">{p.unit}</td>
+                      <td className="p-4 w-40 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className="text-xs font-mono tracking-wider">{p.barcode}</span>
                           <button 
                             onClick={() => setIsBarcodeOpen(p)}
-                            className="p-1 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 text-slate-500 dark:text-slate-300 hover:text-blue-600 rounded cursor-pointer"
+                            className="p-1 bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 text-slate-500 dark:text-slate-200 hover:text-blue-600 rounded cursor-pointer"
                             title="Xếp chi tiết mã vạch"
                           >
                             <Eye className="h-3.5 w-3.5" />

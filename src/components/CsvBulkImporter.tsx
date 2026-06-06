@@ -491,7 +491,7 @@ export default function CsvBulkImporter({
               <div className="space-y-3">
                 <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-tight block">Xem trước 3 ghi nhận khớp mẫu</span>
                 <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-x-auto">
-                  <table className="w-full text-left text-[11px] border-collapse min-w-[600px]">
+                  <table className="w-full text-left text-[11px] border-collapse min-w-[850px]">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-450 uppercase font-black tracking-wider">
                         <th className="p-2.5 w-12 text-center">STT</th>

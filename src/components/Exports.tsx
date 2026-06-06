@@ -332,17 +332,17 @@ export default function Exports({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[750px] md:min-w-full">
+          <table className="w-full text-left border-collapse min-w-[1050px] lg:min-w-full">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 dark:bg-slate-950/25 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4">Ngày yêu cầu</th>
-                <th className="p-4">Mã phiếu bốc</th>
-                <th className="p-4">Đối tác khách nhận</th>
-                <th className="p-4">Loại hàng / Khối lượng</th>
-                <th className="p-4 text-right">Tổng thanh toán</th>
-                <th className="p-4">Mô tả và Ghi chú</th>
-                <th className="p-4 text-center">Trạng thái</th>
-                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && <th className="p-4 text-right">Hành động duyệt</th>}
+                <th className="p-4 w-40 whitespace-nowrap">Ngày yêu cầu</th>
+                <th className="p-4 w-32 whitespace-nowrap">Mã phiếu bốc</th>
+                <th className="p-4 min-w-[200px] whitespace-nowrap">Đối tác khách nhận</th>
+                <th className="p-4 w-44 whitespace-nowrap">Loại hàng / Khối lượng</th>
+                <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>
+                <th className="p-4 min-w-[150px] max-w-[220px] whitespace-nowrap">Mô tả và Ghi chú</th>
+                <th className="p-4 w-28 text-center whitespace-nowrap">Trạng thái</th>
+                {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && <th className="p-4 w-36 text-right whitespace-nowrap">Hành động duyệt</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-sm text-slate-705 dark:text-slate-300">
@@ -353,23 +353,23 @@ export default function Exports({
 
                   return (
                     <tr key={exp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
-                      <td className="p-4 whitespace-nowrap text-xs font-mono text-slate-405">
+                      <td className="p-4 w-40 whitespace-nowrap text-xs font-mono text-slate-400">
                         {formatDate(exp.date)}
                       </td>
-                      <td className="p-4 font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                      <td className="p-4 w-32 font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
                         {exp.code}
                       </td>
-                      <td className="p-4 font-semibold text-slate-800 dark:text-slate-205">
+                      <td className="p-4 min-w-[200px] font-semibold text-slate-800 dark:text-slate-200">
                         {custName}
                       </td>
-                      <td className="p-4">{totalUnits} đơn vị hàng hóa</td>
-                      <td className="p-4 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                      <td className="p-4 w-44 whitespace-nowrap">{totalUnits} đơn vị hàng hóa</td>
+                      <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
                         {formatCurrency(exp.totalAmount)}
                       </td>
-                      <td className="p-4 text-slate-400 max-w-[160px] truncate" title={exp.notes}>
+                      <td className="p-4 min-w-[150px] max-w-[220px] text-slate-400 truncate" title={exp.notes}>
                         {exp.notes || '—'}
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 w-28 text-center whitespace-nowrap">
                         {getStatusBadge(exp.status)}
                       </td>
 {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && (

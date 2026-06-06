@@ -260,16 +260,16 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
+          <table className="w-full text-left border-collapse min-w-[950px] lg:min-w-full">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 dark:bg-slate-950/25 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                <th className="p-4">Thời gian</th>
-                <th className="p-4">Mã phiếu</th>
-                <th className="p-4">Nhà cung cấp</th>
-                <th className="p-4">Số lượng sản phẩm</th>
-                <th className="p-4 text-right">Tổng thanh toán</th>
-                <th className="p-4">Ghi chú</th>
-                <th className="p-4 text-center">Trạng thái</th>
+                <th className="p-4 w-40 whitespace-nowrap">Thời gian</th>
+                <th className="p-4 w-32 whitespace-nowrap">Mã phiếu</th>
+                <th className="p-4 min-w-[200px] whitespace-nowrap">Nhà cung cấp</th>
+                <th className="p-4 w-44 whitespace-nowrap">Số lượng sản phẩm</th>
+                <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>
+                <th className="p-4 min-w-[150px] whitespace-nowrap">Ghi chú</th>
+                <th className="p-4 w-32 text-center whitespace-nowrap">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-sm text-slate-705 dark:text-slate-300">
@@ -280,23 +280,23 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
 
                   return (
                     <tr key={imp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
-                      <td className="p-4 whitespace-nowrap text-xs font-mono text-slate-400">
+                      <td className="p-4 w-40 whitespace-nowrap text-xs font-mono text-slate-400">
                         {formatDate(imp.date)}
                       </td>
-                      <td className="p-4 font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                      <td className="p-4 w-32 font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
                         {imp.code}
                       </td>
-                      <td className="p-4 font-semibold text-slate-800 dark:text-slate-205">
+                      <td className="p-4 min-w-[200px] font-semibold text-slate-800 dark:text-slate-202">
                         {sName}
                       </td>
-                      <td className="p-4">{totalQty} đơn vị hàng</td>
-                      <td className="p-4 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                      <td className="p-4 w-44 whitespace-nowrap">{totalQty} đơn vị hàng</td>
+                      <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
                         {formatCurrency(imp.totalAmount)}
                       </td>
-                      <td className="p-4 text-slate-400 max-w-[200px] truncate" title={imp.notes}>
+                      <td className="p-4 min-w-[150px] text-slate-400 truncate" title={imp.notes}>
                         {imp.notes || '—'}
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 w-32 text-center whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-450 px-2 py-0.5 rounded-full font-bold uppercase">
                           <CheckCircle className="h-3 w-3" /> Đã nhập kho
                         </span>

@@ -472,34 +472,34 @@ export default function Warehouses({
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs min-w-[600px] md:min-w-full">
+              <table className="w-full text-left border-collapse text-xs min-w-[850px] lg:min-w-full">
                 <thead>
                   <tr className="bg-slate-55 border-b border-slate-100 dark:bg-slate-950 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="p-3">Ngày di động</th>
-                    <th className="p-3">Sản phẩm</th>
-                    <th className="p-3">Kho gốc</th>
-                    <th className="p-3">Kho đích bến</th>
-                    <th className="p-3 text-right">Khối lượng</th>
-                    <th className="p-3">Lý do</th>
+                    <th className="p-3 w-40 whitespace-nowrap">Ngày di động</th>
+                    <th className="p-3 min-w-[180px] whitespace-nowrap">Sản phẩm</th>
+                    <th className="p-3 w-36 whitespace-nowrap">Kho gốc</th>
+                    <th className="p-3 w-36 whitespace-nowrap">Kho đích bến</th>
+                    <th className="p-3 text-right w-32 whitespace-nowrap">Khối lượng</th>
+                    <th className="p-3 min-w-[150px] whitespace-nowrap">Lý do</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-slate-705 dark:text-slate-300">
                   {mutations.length > 0 ? (
                     mutations.map(m => {
-                      const pName = products.find(p => p.id === m.productId)?.name || 'Khác';
-                      const fWh = warehouses.find(w => w.id === m.fromWarehouseId)?.name || 'Nguồn';
-                      const tWh = warehouses.find(w => w.id === m.toWarehouseId)?.name || 'Đích';
+                       const pName = products.find(p => p.id === m.productId)?.name || 'Khác';
+                       const fWh = warehouses.find(w => w.id === m.fromWarehouseId)?.name || 'Nguồn';
+                       const tWh = warehouses.find(w => w.id === m.toWarehouseId)?.name || 'Đích';
 
-                      return (
-                        <tr key={m.id} className="hover:bg-slate-50/20">
-                          <td className="p-3 text-slate-400 whitespace-nowrap">{formatDate(m.date)}</td>
-                          <td className="p-3 font-bold text-slate-850 dark:text-white">{pName}</td>
-                          <td className="p-3 text-slate-600 dark:text-slate-400">{fWh}</td>
-                          <td className="p-3 text-slate-600 dark:text-slate-400">{tWh}</td>
-                          <td className="p-3 text-right font-bold text-slate-900 dark:text-white whitespace-nowrap">{m.quantity}</td>
-                          <td className="p-3 text-slate-400">{m.notes || '—'}</td>
-                        </tr>
-                      );
+                       return (
+                         <tr key={m.id} className="hover:bg-slate-50/20">
+                           <td className="p-3 w-40 text-slate-400 whitespace-nowrap">{formatDate(m.date)}</td>
+                           <td className="p-3 min-w-[180px] font-bold text-slate-850 dark:text-white">{pName}</td>
+                           <td className="p-3 w-36 text-slate-600 dark:text-slate-400 whitespace-nowrap">{fWh}</td>
+                           <td className="p-3 w-36 text-slate-600 dark:text-slate-400 whitespace-nowrap">{tWh}</td>
+                           <td className="p-3 text-right w-32 font-bold text-slate-900 dark:text-white whitespace-nowrap">{m.quantity}</td>
+                           <td className="p-3 min-w-[150px] text-slate-400">{m.notes || '—'}</td>
+                         </tr>
+                       );
                     })
                   ) : (
                     <tr>
@@ -517,14 +517,14 @@ export default function Warehouses({
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs min-w-[600px] md:min-w-full">
+              <table className="w-full text-left border-collapse text-xs min-w-[850px] lg:min-w-full">
                 <thead>
                   <tr className="bg-slate-55 border-b border-slate-100 dark:bg-slate-950 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="p-3">Thời điểm</th>
-                    <th className="p-3">Chi nhánh kiểm kho</th>
-                    <th className="p-3">Tổng số mặt hàng đã kiểm</th>
-                    <th className="p-3">Ghi chú kiểm soát</th>
-                    <th className="p-3 text-center">Trạng thái</th>
+                    <th className="p-3 w-40 whitespace-nowrap">Thời điểm</th>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">Chi nhánh kiểm kho</th>
+                    <th className="p-3 w-52 whitespace-nowrap">Tổng số mặt hàng đã kiểm</th>
+                    <th className="p-3 min-w-[150px] whitespace-nowrap">Ghi chú kiểm soát</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-slate-705 dark:text-slate-300">
@@ -533,11 +533,11 @@ export default function Warehouses({
                       const whName = warehouses.find(w => w.id === s.warehouseId)?.name || 'Kho';
                       return (
                         <tr key={s.id} className="hover:bg-slate-50/20">
-                          <td className="p-3 text-slate-400 whitespace-nowrap">{formatDate(s.date)}</td>
-                          <td className="p-3 font-bold text-slate-850 dark:text-white">{whName}</td>
-                          <td className="p-3 font-semibold">{s.items.length} mặt hàng</td>
-                          <td className="p-3 text-slate-450">{s.notes || '—'}</td>
-                          <td className="p-3 text-center">
+                          <td className="p-3 w-40 text-slate-400 whitespace-nowrap">{formatDate(s.date)}</td>
+                          <td className="p-3 min-w-[200px] font-bold text-slate-850 dark:text-white">{whName}</td>
+                          <td className="p-3 w-52 font-semibold whitespace-nowrap">{s.items.length} mặt hàng</td>
+                          <td className="p-3 min-w-[150px] text-slate-450">{s.notes || '—'}</td>
+                          <td className="p-3 w-36 text-center whitespace-nowrap">
                             <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-bold">
                               <CheckCircle className="h-3 w-3" /> ĐÃ ĐỒNG BỘ
                             </span>

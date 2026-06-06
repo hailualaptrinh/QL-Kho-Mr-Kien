@@ -1115,29 +1115,29 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu phân bổ tài sản dồi dào
             </div>
-            <table className="w-full text-left border-collapse text-xs min-w-[700px] md:min-w-full">
+            <table className="w-full text-left border-collapse text-xs min-w-[900px] lg:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
-                  <th className="p-4">Mã và Sản phẩm</th>
-                  <th className="p-4 text-center">Đơn vị</th>
-                  <th className="p-4 text-right">Lượng tồn</th>
-                  <th className="p-4 text-right">Giá gốc mua (VND)</th>
-                  <th className="p-4 text-right">Giá bán đề xuất (VND)</th>
-                  <th className="p-4 text-right font-bold text-slate-900 dark:text-white">Tổng Trị Giá Vốn</th>
+                  <th className="p-4 min-w-[200px]">Mã và Sản phẩm</th>
+                  <th className="p-4 text-center w-24 whitespace-nowrap">Đơn vị</th>
+                  <th className="p-4 text-right w-28 whitespace-nowrap">Lượng tồn</th>
+                  <th className="p-4 text-right w-36 whitespace-nowrap">Giá gốc mua (VND)</th>
+                  <th className="p-4 text-right w-40 whitespace-nowrap">Giá bán đề xuất (VND)</th>
+                  <th className="p-4 text-right w-40 font-bold text-slate-900 dark:text-white whitespace-nowrap">Tổng Trị Giá Vốn</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
                 {products.map(p => (
                   <tr key={p.id} className="hover:bg-slate-55/20 text-slate-705 dark:text-slate-300">
-                    <td className="p-4 font-bold text-slate-850 dark:text-white">
+                    <td className="p-4 min-w-[200px] font-bold text-slate-850 dark:text-white">
                       {p.name}
                       <span className="block font-mono text-[10px] text-slate-400 font-normal">{p.code}</span>
                     </td>
-                    <td className="p-4 text-center">{p.unit}</td>
-                    <td className="p-4 text-right font-mono font-bold">{p.stock}</td>
-                    <td className="p-4 text-right font-mono">{p.importPrice.toLocaleString()} đ</td>
-                    <td className="p-4 text-right font-mono">{p.exportPrice.toLocaleString()} đ</td>
-                    <td className="p-4 text-right font-mono font-bold text-slate-950 dark:text-white">
+                    <td className="p-4 text-center w-24 whitespace-nowrap">{p.unit}</td>
+                    <td className="p-4 text-right w-28 whitespace-nowrap font-mono font-bold">{p.stock}</td>
+                    <td className="p-4 text-right w-36 whitespace-nowrap font-mono">{p.importPrice.toLocaleString()} đ</td>
+                    <td className="p-4 text-right w-40 whitespace-nowrap font-mono">{p.exportPrice.toLocaleString()} đ</td>
+                    <td className="p-4 text-right w-40 whitespace-nowrap font-mono font-bold text-slate-950 dark:text-white">
                       {((p.stock || 0) * (p.importPrice || 0)).toLocaleString()} đ
                     </td>
                   </tr>
@@ -1152,14 +1152,14 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu bốc dỡ nhập kho lưu bãi
             </div>
-            <table className="w-full text-left border-collapse text-xs min-w-[650px] md:min-w-full">
+            <table className="w-full text-left border-collapse text-xs min-w-[900px] lg:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
-                  <th className="p-4">Mã Phiếu</th>
-                  <th className="p-4">Thời Gian Nhập</th>
-                  <th className="p-4">Nhà Cung Cấp</th>
-                  <th className="p-4 text-center">Các dòng vật tư</th>
-                  <th className="p-4 text-right font-bold">Thành Tiền Giải Ngân</th>
+                  <th className="p-4 w-32 whitespace-nowrap">Mã Phiếu</th>
+                  <th className="p-4 w-40 whitespace-nowrap">Thời Gian Nhập</th>
+                  <th className="p-4 min-w-[180px] whitespace-nowrap">Nhà Cung Cấp</th>
+                  <th className="p-4 w-36 text-center whitespace-nowrap">Các dòng vật tư</th>
+                  <th className="p-4 w-40 text-right font-bold whitespace-nowrap">Thành Tiền Giải Ngân</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
@@ -1167,11 +1167,11 @@ export default function Reports({ imports, exports, products, suppliers, custome
                   const sup = suppliers.find(s => s.id === imp.supplierId);
                   return (
                     <tr key={imp.id} className="hover:bg-slate-55/20 text-slate-705 dark:text-slate-300">
-                      <td className="p-4 font-bold font-mono text-slate-850 dark:text-white">{imp.code}</td>
-                      <td className="p-4 text-slate-400">{formatDate(imp.date)}</td>
-                      <td className="p-4 font-semibold">{sup?.name || 'Vintech'}</td>
-                      <td className="p-4 text-center">{imp.items.length} loại hàng</td>
-                      <td className="p-4 text-right font-mono font-bold text-slate-950 dark:text-white">{imp.totalAmount.toLocaleString()} đ</td>
+                      <td className="p-4 w-32 font-bold font-mono text-slate-850 dark:text-white whitespace-nowrap">{imp.code}</td>
+                      <td className="p-4 w-40 text-slate-400 whitespace-nowrap">{formatDate(imp.date)}</td>
+                      <td className="p-4 min-w-[180px] font-semibold">{sup?.name || 'Vintech'}</td>
+                      <td className="p-4 w-36 text-center whitespace-nowrap">{imp.items.length} loại hàng</td>
+                      <td className="p-4 w-40 text-right font-mono font-bold text-slate-950 dark:text-white whitespace-nowrap">{imp.totalAmount.toLocaleString()} đ</td>
                     </tr>
                   );
                 })}
@@ -1185,14 +1185,14 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu bốc xuất thu tiền khách hàng
             </div>
-            <table className="w-full text-left border-collapse text-xs min-w-[650px] md:min-w-full">
+            <table className="w-full text-left border-collapse text-xs min-w-[900px] lg:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
-                  <th className="p-4">Mã Đơn Bốc</th>
-                  <th className="p-4">Thời Gian Bàn Giao</th>
-                  <th className="p-4">Đối Tác Khách Nhận</th>
-                  <th className="p-4 text-center">Trạng Thái Bốc Xếp</th>
-                  <th className="p-4 text-right font-bold">Thành Tiền Thu Nhập</th>
+                  <th className="p-4 w-32 whitespace-nowrap">Mã Đơn Bốc</th>
+                  <th className="p-4 w-40 whitespace-nowrap">Thời Gian Bàn Giao</th>
+                  <th className="p-4 min-w-[180px] whitespace-nowrap">Đối Tác Khách Nhận</th>
+                  <th className="p-4 w-36 text-center whitespace-nowrap">Trạng Thái Bốc Xếp</th>
+                  <th className="p-4 w-44 text-right font-bold whitespace-nowrap">Thành Tiền Thu Nhập</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
@@ -1200,10 +1200,10 @@ export default function Reports({ imports, exports, products, suppliers, custome
                   const cust = customers.find(c => c.id === exp.customerId);
                   return (
                     <tr key={exp.id} className="hover:bg-slate-55/20 text-slate-750 dark:text-slate-300">
-                      <td className="p-4 font-bold font-mono text-slate-850 dark:text-white">{exp.code}</td>
-                      <td className="p-4 text-slate-404">{formatDate(exp.date)}</td>
-                      <td className="p-4 font-semibold">{cust?.name || 'Bách hóa Ta'}</td>
-                      <td className="p-4 text-center">
+                      <td className="p-4 w-32 font-bold font-mono text-slate-850 dark:text-white whitespace-nowrap">{exp.code}</td>
+                      <td className="p-4 w-40 text-slate-404 whitespace-nowrap">{formatDate(exp.date)}</td>
+                      <td className="p-4 min-w-[180px] font-semibold">{cust?.name || 'Bách hóa Ta'}</td>
+                      <td className="p-4 w-36 text-center whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${exp.status === 'SHIPPED' ? 'bg-emerald-50 text-emerald-600' : exp.status === 'CANCELLED' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'}`}>
                           {exp.status === 'SHIPPED' ? 'Đã xuất kho' : exp.status === 'CANCELLED' ? 'Đã hủy đơn' : 'Đang duyệt kiểm'}
                         </span>
