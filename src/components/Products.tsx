@@ -285,7 +285,7 @@ export default function Products({
       {/* Grid or table table products */}
       <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 dark:bg-slate-950/40 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
                 <th className="p-4 w-20">Ảnh</th>

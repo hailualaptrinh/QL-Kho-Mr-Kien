@@ -472,7 +472,7 @@ export default function Warehouses({
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[600px] md:min-w-full">
                 <thead>
                   <tr className="bg-slate-55 border-b border-slate-100 dark:bg-slate-950 text-slate-400 font-bold uppercase tracking-wider">
                     <th className="p-3">Ngày di động</th>
@@ -517,7 +517,7 @@ export default function Warehouses({
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[600px] md:min-w-full">
                 <thead>
                   <tr className="bg-slate-55 border-b border-slate-100 dark:bg-slate-950 text-slate-400 font-bold uppercase tracking-wider">
                     <th className="p-3">Thời điểm</th>

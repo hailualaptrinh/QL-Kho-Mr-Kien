@@ -260,7 +260,7 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[700px] md:min-w-full">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 dark:bg-slate-950/25 dark:border-slate-850 text-slate-400 font-bold text-xs uppercase tracking-wider">
                 <th className="p-4">Thời gian</th>

@@ -255,7 +255,7 @@ export default function Employees({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[750px] md:min-w-full">
               <thead>
                 <tr className="bg-slate-100/50 dark:bg-slate-850/40 text-slate-400 font-bold border-b dark:border-slate-800/60">
                   <th className="p-4">Tài khoản & Hồ sơ</th>

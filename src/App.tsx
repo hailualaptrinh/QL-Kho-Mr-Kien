@@ -1163,8 +1163,8 @@ export default function App() {
       <div className="flex-1 flex flex-col h-screen overflow-y-auto">
         
         {/* TOP COMPONENT INTERFACE NAVBAR */}
-        <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-4 shrink-0 flex items-center justify-between sticky top-0 z-40 px-6 transition-colors">
-          <div className="flex items-center gap-4">
+        <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 p-3 sm:p-4 shrink-0 flex items-center justify-between sticky top-0 z-40 px-3 sm:px-6 transition-colors">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Sidebar trigger on desktop */}
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -1174,18 +1174,18 @@ export default function App() {
             </button>
             
             {/* Mobile Title */}
-            <div className="md:hidden flex items-center gap-2">
-              <span className="font-extrabold text-slate-900 dark:text-white text-base">MR KIÊN ERP</span>
+            <div className="md:hidden flex items-center gap-1.5">
+              <span className="font-extrabold text-slate-900 dark:text-white text-sm xs:text-base">MR KIÊN ERP</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-4">
             
             {/* Dark mode switch */}
             <button
               id="btn-toggle-dark"
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2.5 bg-slate-50 dark:bg-slate-800 border dark:border-slate-850 rounded-xl text-slate-600 dark:text-slate-3 bg-opacity-70 text-sm hover:bg-blue-50 transition-all cursor-pointer"
+              className="p-2 sm:p-2.5 bg-slate-50 dark:bg-slate-800 border dark:border-slate-850 rounded-xl text-slate-600 dark:text-slate-3 bg-opacity-70 text-sm hover:bg-blue-50 transition-all cursor-pointer"
               title={isDarkMode ? 'Đổi sang Giao diện sáng' : 'Đổi sang Giao diện tối'}
             >
               {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -1196,7 +1196,7 @@ export default function App() {
               <button
                 id="btn-notification-bell"
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="p-2.5 bg-slate-50 dark:bg-slate-800 border dark:border-slate-850 rounded-xl text-slate-600 dark:text-slate-3 bg-opacity-70 text-sm hover:bg-blue-50 transition-all cursor-pointer"
+                className="p-2 sm:p-2.5 bg-slate-50 dark:bg-slate-800 border dark:border-slate-850 rounded-xl text-slate-600 dark:text-slate-3 bg-opacity-70 text-sm hover:bg-blue-50 transition-all cursor-pointer"
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
@@ -1206,7 +1206,7 @@ export default function App() {
 
               {/* Alerts dropdown dropdown menu */}
               {notifOpen && (
-                <div className="absolute right-0 mt-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xl w-80 overflow-hidden z-50 animate-slide-in">
+                <div className="fixed sm:absolute top-[64px] sm:top-auto left-4 right-4 sm:left-auto sm:right-0 sm:w-80 mx-auto sm:mx-0 mt-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden z-50 animate-slide-in">
                   <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950 border-b flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-900 dark:text-white">THÀNH PHẦN THÔNG BÁO ({unreadCount} Mới)</span>
                     <button onClick={handleMarkNotificationsRead} className="text-blue-600 hover:underline">Đánh dấu tất cả</button>
@@ -1236,9 +1236,9 @@ export default function App() {
             </div>
 
             {/* Profile trigger */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 pl-1.5 sm:pl-2 border-l border-slate-200">
               <span className="text-xs font-bold text-slate-600 dark:text-slate-300 hidden md:inline">{user?.fullName}</span>
-              <span className={`text-[9.5px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+              <span className={`text-[9px] sm:text-[9.5px] px-1.5 sm:px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                 (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                 user?.role === 'MANAGER' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
                 user?.role === 'STOCKKEEPER' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :

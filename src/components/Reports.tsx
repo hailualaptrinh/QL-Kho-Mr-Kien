@@ -1115,7 +1115,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu phân bổ tài sản dồi dào
             </div>
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[700px] md:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
                   <th className="p-4">Mã và Sản phẩm</th>
@@ -1152,7 +1152,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu bốc dỡ nhập kho lưu bãi
             </div>
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px] md:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
                   <th className="p-4">Mã Phiếu</th>
@@ -1185,7 +1185,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
             <div className="p-4 bg-slate-50 border-b dark:bg-slate-950/20 text-xs font-bold text-slate-500 uppercase tracking-wider">
               Bảng biểu bốc xuất thu tiền khách hàng
             </div>
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[650px] md:min-w-full">
               <thead>
                 <tr className="bg-slate-50/20 border-b text-slate-400 font-bold uppercase">
                   <th className="p-4">Mã Đơn Bốc</th>
@@ -1510,7 +1510,7 @@ export default function Reports({ imports, exports, products, suppliers, custome
 
                     {!loadingBackups && backupsList.length > 0 && (
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left border-collapse min-w-[500px]">
                           <thead>
                             <tr className="border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase text-slate-450 tracking-wider">
                               <th className="py-2.5">TÊN FILE</th>
