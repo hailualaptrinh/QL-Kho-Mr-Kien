@@ -25,6 +25,7 @@ export default function Exports({
   exports, products, customers, user, 
   onAddExport, onUpdateExportStatus, onRefresh 
 }: ExportsProps) {
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [notes, setNotes] = useState('');
@@ -297,12 +298,16 @@ export default function Exports({
 
             {/* Sum and Drawer footer actions */}
             <div className="border-t border-slate-50 dark:border-slate-850 pt-4 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-left">
-                <span className="text-xs text-slate-400">GIÁ TRỊ TỔNG ĐƠN HÀNG XUẤT KHO</span>
-                <p className="font-mono text-xl font-black text-blue-605 dark:text-blue-400 mt-0.5">
-                  {formatCurrency(calculateGrandTotal())}
-                </p>
-              </div>
+              {isAdmin ? (
+                <div className="text-left">
+                  <span className="text-xs text-slate-400">GIÁ TRỊ TỔNG ĐƠN HÀNG XUẤT KHO</span>
+                  <p className="font-mono text-xl font-black text-blue-605 dark:text-blue-400 mt-0.5">
+                    {formatCurrency(calculateGrandTotal())}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-left"></div>
+              )}
 
               <div className="flex gap-2">
                 <button
@@ -339,7 +344,7 @@ export default function Exports({
                 <th className="p-4 w-32 whitespace-nowrap">Mã phiếu bốc</th>
                 <th className="p-4 min-w-[200px] whitespace-nowrap">Đối tác khách nhận</th>
                 <th className="p-4 w-44 whitespace-nowrap">Loại hàng / Khối lượng</th>
-                <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>
+                {isAdmin && <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>}
                 <th className="p-4 min-w-[150px] max-w-[220px] whitespace-nowrap">Mô tả và Ghi chú</th>
                 <th className="p-4 w-28 text-center whitespace-nowrap">Trạng thái</th>
                 {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.permissions?.approve_exports) && <th className="p-4 w-36 text-right whitespace-nowrap">Hành động duyệt</th>}
@@ -363,9 +368,11 @@ export default function Exports({
                         {custName}
                       </td>
                       <td className="p-4 w-44 whitespace-nowrap">{totalUnits} đơn vị hàng hóa</td>
-                      <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
-                        {formatCurrency(exp.totalAmount)}
-                      </td>
+                      {isAdmin && (
+                        <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                          {formatCurrency(exp.totalAmount)}
+                        </td>
+                      )}
                       <td className="p-4 min-w-[150px] max-w-[220px] text-slate-400 truncate" title={exp.notes}>
                         {exp.notes || '—'}
                       </td>

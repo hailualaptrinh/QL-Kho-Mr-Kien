@@ -61,6 +61,7 @@ export default function Products({
   products, categories, suppliers, user, 
   onAddProduct, onUpdateProduct, onDeleteProduct, onRefresh 
 }: ProductsProps) {
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -325,7 +326,7 @@ export default function Products({
                   <div className="flex items-center gap-1">Sản phẩm <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
                 <th className="p-4 w-44 whitespace-nowrap text-left">Danh mục</th>
-                <th className="p-4 w-36 text-right whitespace-nowrap">Giá nhập</th>
+                {isAdmin && <th className="p-4 w-36 text-right whitespace-nowrap">Giá nhập</th>}
                 <th className="p-4 w-36 text-right cursor-pointer hover:text-slate-600 select-none whitespace-nowrap" onClick={() => toggleSort('price')}>
                   <div className="flex items-center justify-end gap-1">Giá xuất <ArrowUpDown className="h-3.5 w-3.5" /></div>
                 </th>
@@ -359,9 +360,11 @@ export default function Products({
                           {cat}
                         </span>
                       </td>
-                      <td className="p-4 w-36 text-right font-mono font-medium text-slate-500 whitespace-nowrap animate-fade-in">
-                        {formatCurrency(p.importPrice)}
-                      </td>
+                      {isAdmin && (
+                        <td className="p-4 w-36 text-right font-mono font-medium text-slate-500 whitespace-nowrap animate-fade-in">
+                          {formatCurrency(p.importPrice)}
+                        </td>
+                      )}
                       <td className="p-4 w-36 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap animate-fade-in">
                         {formatCurrency(p.exportPrice)}
                       </td>
@@ -526,16 +529,18 @@ export default function Products({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase">Giá nhập (VND)</label>
-                  <input
-                    type="number"
-                    value={importPrice}
-                    onChange={(e) => setImportPrice(Number(e.target.value))}
-                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white rounded-lg border border-slate-200 dark:border-slate-800 text-sm focus:outline-none font-mono"
-                  />
-                </div>
+              <div className={isAdmin ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
+                {isAdmin && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase">Giá nhập (VND)</label>
+                    <input
+                      type="number"
+                      value={importPrice}
+                      onChange={(e) => setImportPrice(Number(e.target.value))}
+                      className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white rounded-lg border border-slate-200 dark:border-slate-800 text-sm focus:outline-none font-mono"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase">Giá xuất (VND)</label>
                   <input

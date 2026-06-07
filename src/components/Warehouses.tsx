@@ -178,7 +178,8 @@ export default function Warehouses({
           <button
             id="btn-add-warehouse"
             onClick={() => setIsNewWHOpen(!isNewWHOpen)}
-            className="px-4 py-2 bg-blue-605 text-white hover:bg-blue-700 font-bold text-xs rounded-xl shadow cursor-pointer active:scale-95"
+            style={{ backgroundColor: '#1212ec' }}
+            className="px-4 py-2 text-white hover:bg-blue-700 font-bold text-xs rounded-xl shadow cursor-pointer active:scale-95"
           >
             + Xây chi nhánh kho mới
           </button>

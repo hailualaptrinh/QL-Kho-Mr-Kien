@@ -464,41 +464,76 @@ export default function App() {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
 
+      const fetchSafeJSON = async (url: string, defaultValue: any = []) => {
+        try {
+          const res = await fetch(url, { headers });
+          if (!res.ok) {
+            console.warn(`Fetch ${url} returned status ${res.status}`);
+            return defaultValue;
+          }
+          const contentType = res.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            console.warn(`Fetch ${url} returned non-JSON content-type: ${contentType}`);
+            return defaultValue;
+          }
+          const data = await res.json();
+          if (data && data.error) {
+            console.warn(`Fetch ${url} returned error: ${data.error}`);
+            return defaultValue;
+          }
+          return data;
+        } catch (err) {
+          console.error(`Error fetching ${url}:`, err);
+          return defaultValue;
+        }
+      };
+
+      const defaultStats = {
+        totalProductsCount: 0,
+        totalWarehouseStock: 0,
+        totalImportsTodayValue: 0,
+        totalExportsTodayValue: 0,
+        inventoryAssetValuationVal: 0,
+        totalHistoricalRevenueVal: 0,
+        alertProducts: [],
+        chartData: []
+      };
+
       // Parallelize fetches to keep responses extremely snappy
       const [
         statsRes, prodRes, catRes, supRes, cusRes, 
         empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes, usersRes, meRes
       ] = await Promise.all([
-        fetch('/api/reports/dashboard-stats', { headers }).then(r => r.json()),
-        fetch('/api/products', { headers }).then(r => r.json()),
-        fetch('/api/categories', { headers }).then(r => r.json()),
-        fetch('/api/suppliers', { headers }).then(r => r.json()),
-        fetch('/api/customers', { headers }).then(r => r.json()),
-        fetch('/api/employees', { headers }).then(r => r.json()),
-        fetch('/api/imports', { headers }).then(r => r.json()),
-        fetch('/api/exports', { headers }).then(r => r.json()),
-        fetch('/api/mutations', { headers }).then(r => r.json()),
-        fetch('/api/stocktakes', { headers }).then(r => r.json()),
-        fetch('/api/logs', { headers }).then(r => r.json()),
-        fetch('/api/notifications', { headers }).then(r => r.json()),
-        fetch('/api/warehouses', { headers }).then(r => r.json()),
-        fetch('/api/users', { headers }).then(r => r.json()),
-        fetch('/api/auth/me', { headers }).then(r => r.json())
+        fetchSafeJSON('/api/reports/dashboard-stats', defaultStats),
+        fetchSafeJSON('/api/products', []),
+        fetchSafeJSON('/api/categories', []),
+        fetchSafeJSON('/api/suppliers', []),
+        fetchSafeJSON('/api/customers', []),
+        fetchSafeJSON('/api/employees', []),
+        fetchSafeJSON('/api/imports', []),
+        fetchSafeJSON('/api/exports', []),
+        fetchSafeJSON('/api/mutations', []),
+        fetchSafeJSON('/api/stocktakes', []),
+        fetchSafeJSON('/api/logs', []),
+        fetchSafeJSON('/api/notifications', []),
+        fetchSafeJSON('/api/warehouses', []),
+        fetchSafeJSON('/api/users', []),
+        fetchSafeJSON('/api/auth/me', {})
       ]);
 
       setStats(statsRes);
-      setProducts(prodRes || []);
-      setCategories(catRes || []);
-      setSuppliers(supRes || []);
-      setCustomers(cusRes || []);
-      setEmployees(empRes || []);
-      setImports(impRes || []);
-      setExports(expRes || []);
-      setMutations(mutRes || []);
-      setStocktakes(stRes || []);
-      setLogs(logRes || []);
-      setNotifications(notifRes || []);
-      setWarehouses(whRes || []);
+      setProducts(prodRes);
+      setCategories(catRes);
+      setSuppliers(supRes);
+      setCustomers(cusRes);
+      setEmployees(empRes);
+      setImports(impRes);
+      setExports(expRes);
+      setMutations(mutRes);
+      setStocktakes(stRes);
+      setLogs(logRes);
+      setNotifications(notifRes);
+      setWarehouses(whRes);
       setUsersList(Array.isArray(usersRes) ? usersRes : []);
       if (meRes && meRes.user) {
         setUser(meRes.user);
@@ -879,54 +914,7 @@ export default function App() {
             </button>
           </form>
 
-          {/* QUICK LOGIN PRESETS */}
-          <div className="mt-5 pt-4 border-t border-slate-900">
-            <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest text-center mb-2.5">
-              ĐĂNG NHẬP NHANH (TÀI KHOẢN MẪU)
-            </p>
-            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('SUPER_ADMIN')}
-                className="p-2 border border-slate-800 hover:border-blue-500 rounded-xl bg-slate-900/40 text-slate-300 hover:text-white transition-all text-left flex flex-col cursor-pointer"
-              >
-                <span className="font-bold text-blue-400">Admin</span>
-                <span className="text-[9px] text-slate-500">admin / admin123</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('MANAGER')}
-                className="p-2 border border-slate-800 hover:border-emerald-500 rounded-xl bg-slate-900/40 text-slate-300 hover:text-white transition-all text-left flex flex-col cursor-pointer"
-              >
-                <span className="font-bold text-emerald-400">Quản lý kho</span>
-                <span className="text-[9px] text-slate-500">manager / manager123</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('STOCKKEEPER')}
-                className="p-2 border border-slate-800 hover:border-amber-500 rounded-xl bg-slate-900/40 text-slate-300 hover:text-white transition-all text-left flex flex-col cursor-pointer"
-              >
-                <span className="font-bold text-amber-400">Thủ kho🔑</span>
-                <span className="text-[9px] text-slate-500">kho1 / kho123</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('SALES')}
-                className="p-2 border border-slate-800 hover:border-pink-500 rounded-xl bg-slate-900/40 text-slate-300 hover:text-white transition-all text-left flex flex-col cursor-pointer"
-              >
-                <span className="font-bold text-pink-400">Bán hàng💼</span>
-                <span className="text-[9px] text-slate-500">sales1 / sales123</span>
-              </button>
-            </div>
-            
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('VIEWER')}
-              className="mt-2 w-full p-2 border border-slate-800 hover:border-indigo-500 rounded-xl bg-slate-900/40 text-slate-300 hover:text-white transition-all text-[10px] text-center block cursor-pointer font-bold"
-            >
-              👁️ Đối tác (Chỉ xem): viewer / view123
-            </button>
-          </div>
+
 
           {/* Collapsible Server Address config details */}
           <div className="mt-4 pt-3.5 border-t border-slate-900 flex flex-col items-center">
@@ -1083,7 +1071,7 @@ export default function App() {
               </button>
             )}
 
-            {(hasPermission('view_customers') || hasPermission('view_suppliers')) && (
+            {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
               <button
                 id="sidebar-nav-partners"
                 onClick={() => setActiveTab('partners')}
@@ -1094,7 +1082,7 @@ export default function App() {
               </button>
             )}
 
-            {hasPermission('view_employees') && (
+            {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
               <button
                 id="sidebar-nav-employees"
                 onClick={() => setActiveTab('employees')}
@@ -1316,7 +1304,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'partners' && (
+          {activeTab === 'partners' && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
             <Customers
               customers={customers}
               suppliers={suppliers}
@@ -1327,7 +1315,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'employees' && (
+          {activeTab === 'employees' && (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
             <Employees
               employees={employees}
               user={user}

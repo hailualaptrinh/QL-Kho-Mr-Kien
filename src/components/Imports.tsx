@@ -21,6 +21,7 @@ interface ImportsProps {
 }
 
 export default function Imports({ imports, products, suppliers, user, onAddImport, onRefresh }: ImportsProps) {
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [notes, setNotes] = useState('');
@@ -182,21 +183,25 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
                       </div>
 
                       {/* Import Price Override */}
-                      <div className="w-full md:w-44 flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-2 border border-slate-200 rounded-lg">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase">Giá:</span>
-                        <input
-                          type="number"
-                          required
-                          value={line.price}
-                          onChange={(e) => handleLineChange(idx, 'price', e.target.value)}
-                          className="w-full bg-transparent text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
-                        />
-                      </div>
+                      {isAdmin && (
+                        <div className="w-full md:w-44 flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-2 border border-slate-200 rounded-lg">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase">Giá:</span>
+                          <input
+                            type="number"
+                            required
+                            value={line.price}
+                            onChange={(e) => handleLineChange(idx, 'price', e.target.value)}
+                            className="w-full bg-transparent text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none"
+                          />
+                        </div>
+                      )}
 
                       {/* Row Total */}
-                      <div className="w-full md:w-36 text-right font-mono text-xs font-bold text-slate-800 dark:text-slate-350 pr-2">
-                        {((line.quantity || 0) * (line.price || 0)).toLocaleString('vi-VN')} đ
-                      </div>
+                      {isAdmin && (
+                        <div className="w-full md:w-36 text-right font-mono text-xs font-bold text-slate-800 dark:text-slate-350 pr-2">
+                          {((line.quantity || 0) * (line.price || 0)).toLocaleString('vi-VN')} đ
+                        </div>
+                      )}
 
                       {/* Action Cancel */}
                       <button
@@ -225,12 +230,16 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
 
             {/* Sum and Drawer footer actions */}
             <div className="border-t border-slate-50 dark:border-slate-850 pt-4 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-left">
-                <span className="text-xs text-slate-400">TỔNG GIÁ TRỊ PHIẾU NHẬP</span>
-                <p className="font-mono text-xl font-black text-rose-600 dark:text-rose-450 mt-0.5">
-                  {formatCurrency(calculateGrandTotal())}
-                </p>
-              </div>
+              {isAdmin ? (
+                <div className="text-left">
+                  <span className="text-xs text-slate-400">TỔNG GIÁ TRỊ PHIẾU NHẬP</span>
+                  <p className="font-mono text-xl font-black text-rose-600 dark:text-rose-450 mt-0.5">
+                    {formatCurrency(calculateGrandTotal())}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-left"></div>
+              )}
 
               <div className="flex gap-2">
                 <button
@@ -267,7 +276,7 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
                 <th className="p-4 w-32 whitespace-nowrap">Mã phiếu</th>
                 <th className="p-4 min-w-[200px] whitespace-nowrap">Nhà cung cấp</th>
                 <th className="p-4 w-44 whitespace-nowrap">Số lượng sản phẩm</th>
-                <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>
+                {isAdmin && <th className="p-4 w-36 text-right whitespace-nowrap">Tổng thanh toán</th>}
                 <th className="p-4 min-w-[150px] whitespace-nowrap">Ghi chú</th>
                 <th className="p-4 w-32 text-center whitespace-nowrap">Trạng thái</th>
               </tr>
@@ -290,9 +299,11 @@ export default function Imports({ imports, products, suppliers, user, onAddImpor
                         {sName}
                       </td>
                       <td className="p-4 w-44 whitespace-nowrap">{totalQty} đơn vị hàng</td>
-                      <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
-                        {formatCurrency(imp.totalAmount)}
-                      </td>
+                      {isAdmin && (
+                        <td className="p-4 w-36 text-right font-bold font-mono text-slate-900 dark:text-white whitespace-nowrap">
+                          {formatCurrency(imp.totalAmount)}
+                        </td>
+                      )}
                       <td className="p-4 min-w-[150px] text-slate-400 truncate" title={imp.notes}>
                         {imp.notes || '—'}
                       </td>
