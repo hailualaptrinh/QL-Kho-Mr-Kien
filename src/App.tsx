@@ -1352,32 +1352,78 @@ export default function App() {
         </main>
 
         {/* MOBILE WORKSPACE CONTROLS DOCK (Strictly responsive for touchscreen mobile size) */}
-        <footer className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800/80 flex justify-around py-3 px-1 pb-4 sm:pb-3 text-[10px] text-slate-400 font-extrabold md:hidden">
-          <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+        <span dangerouslySetInnerHTML={{__html: `
+          <style>
+            .no-scrollbar::-webkit-scrollbar {
+              display: none !important;
+            }
+            .no-scrollbar {
+              -ms-overflow-style: none !important;
+              scrollbar-width: none !important;
+            }
+          </style>
+        `}} />
+        <footer className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800/80 flex items-center gap-5.5 overflow-x-auto no-scrollbar py-3 px-4 pb-4 sm:pb-3 text-[10px] text-slate-400 font-extrabold md:hidden">
+          <button onClick={() => setActiveTab('dashboard')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
             <BarChart3 className="h-4 w-4" />
             <span>Dashboard</span>
           </button>
-          <button onClick={() => setActiveTab('products')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'products' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
-            <Boxes className="h-4 w-4" />
-            <span>Sản phẩm</span>
-          </button>
-          <button onClick={() => setActiveTab('imports')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'imports' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
-            <ArrowDownLeft className="h-4 w-4" />
-            <span>Nhập kho</span>
-          </button>
-          <button onClick={() => setActiveTab('exports')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'exports' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
-            <ArrowUpRight className="h-4 w-4" />
-            <span>Xuất kho</span>
-          </button>
-          <button onClick={() => setActiveTab('warehouses')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'warehouses' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
-            <Layers className="h-4 w-4" />
-            <span>Kho bãi</span>
-          </button>
-          <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1 transition-all relative ${activeTab === 'chat' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+          
+          {hasPermission('view_products') && (
+            <button onClick={() => setActiveTab('products')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'products' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <Boxes className="h-4 w-4" />
+              <span>Sản phẩm</span>
+            </button>
+          )}
+
+          {hasPermission('view_imports') && (
+            <button onClick={() => setActiveTab('imports')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'imports' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <ArrowDownLeft className="h-4 w-4" />
+              <span>Nhập kho</span>
+            </button>
+          )}
+
+          {hasPermission('view_exports') && (
+            <button onClick={() => setActiveTab('exports')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'exports' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <ArrowUpRight className="h-4 w-4" />
+              <span>Xuất kho</span>
+            </button>
+          )}
+
+          {hasPermission('view_products') && (
+            <button onClick={() => setActiveTab('warehouses')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'warehouses' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <Layers className="h-4 w-4" />
+              <span>Kho bãi</span>
+            </button>
+          )}
+
+          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+            <button onClick={() => setActiveTab('partners')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'partners' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <Users className="h-4 w-4" />
+              <span>Đối tác & CRM</span>
+            </button>
+          )}
+
+          {(user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') && (
+            <button onClick={() => setActiveTab('employees')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'employees' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <Shield className="h-4 w-4" />
+              <span>Nhân sự</span>
+            </button>
+          )}
+
+          {hasPermission('manage_settings') && (
+            <button onClick={() => setActiveTab('reports')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all ${activeTab === 'reports' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
+              <Settings className="h-4 w-4" />
+              <span>Báo cáo</span>
+            </button>
+          )}
+
+          <button onClick={() => setActiveTab('chat')} className={`flex-shrink-0 flex flex-col items-center gap-1 transition-all relative ${activeTab === 'chat' ? 'text-blue-500 scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
             <MessageSquare className="h-4 w-4" />
             <span>Trò chuyện</span>
           </button>
-          <button onClick={handleLogout} className="flex flex-col items-center gap-1 text-rose-500 hover:text-rose-400">
+          
+          <button onClick={handleLogout} className="flex-shrink-0 flex flex-col items-center gap-1 text-rose-500 hover:text-rose-400">
             <LogOut className="h-4 w-4" />
             <span>Thoát</span>
           </button>
