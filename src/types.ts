@@ -96,6 +96,28 @@ export interface StockMove {
   notes: string;
 }
 
+export interface DeliveryOrder {
+  id: string;
+  code: string;
+  driverName: string;
+  driverPhone: string;
+  vehiclePlate: string;
+  vehicleType: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  productId: string;
+  quantity: number;
+  notes: string;
+  status: 'PENDING' | 'SHIPPING' | 'COMPLETED' | 'DELAYED';
+  gpsStatus: 'ACTIVE' | 'INACTIVE' | 'SIGNAL_LOST';
+  latitude: number;
+  longitude: number;
+  routeProgress: number; // 0 to 100
+  routeCoordinates: { lat: number; lng: number }[];
+  currentLocationName: string;
+  date: string;
+}
+
 export interface OrderItem {
   productId: string;
   quantity: number;

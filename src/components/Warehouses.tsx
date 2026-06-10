@@ -3,29 +3,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Boxes, Send, CheckSquare, ClipboardList, AlertCircle, 
-  MapPin, Plus, CheckCircle, RefreshCw, Layers 
+  MapPin, Plus, CheckCircle, RefreshCw, Layers,
+  Truck, Navigation, Compass, Radio, Activity, Map, Route, ChevronRight, User, Smartphone, Calendar
 } from 'lucide-react';
-import { Warehouse, Product, StockMove, Stocktake } from '../types';
+import { Warehouse, Product, StockMove, Stocktake, DeliveryOrder } from '../types';
 import { formatDate } from '../utils';
+import GoogleDeliveryMap from './GoogleDeliveryMap';
+
 
 interface WarehousesProps {
   warehouses: Warehouse[];
   products: Product[];
   mutations: StockMove[];
+  deliveries?: DeliveryOrder[];
   stocktakes: Stocktake[];
   user: any;
   onAddWarehouse: (data: any) => Promise<any>;
   onTransferStock: (data: any) => Promise<any>;
+  onAddDelivery?: (data: any) => Promise<any>;
+  onUpdateDelivery?: (id: string, data: any) => Promise<any>;
   onAuditStock: (data: any) => Promise<any>;
   onRefresh: () => void;
 }
 
 export default function Warehouses({
-  warehouses, products, mutations, stocktakes, user,
-  onAddWarehouse, onTransferStock, onAuditStock, onRefresh
+  warehouses, products, mutations, deliveries = [], stocktakes, user,
+  onAddWarehouse, onTransferStock, onAddDelivery, onUpdateDelivery, onAuditStock, onRefresh
 }: WarehousesProps) {
   const [activeSubTab, setActiveSubTab] = useState<'status' | 'transfer' | 'audit' | 'logs'>('status');
 
@@ -41,6 +47,21 @@ export default function Warehouses({
   const [transQty, setTransQty] = useState(1);
   const [transNotes, setTransNotes] = useState('');
   const [transferError, setTransferError] = useState('');
+
+  // GPS Delivery tracking states
+  const [enableGPS, setEnableGPS] = useState(true);
+  const [driverName, setDriverName] = useState('Nguyễn Văn Tải');
+  const [driverPhone, setDriverPhone] = useState('0912.445.667');
+  const [vehiclePlate, setVehiclePlate] = useState('29C-884.22');
+  const [vehicleType, setVehicleType] = useState('Suzuki Pro 750kg');
+  const [selectedDlvId, setSelectedDlvId] = useState<string | null>(null);
+
+  // Prefill selectedDlvId on load
+  useEffect(() => {
+    if (deliveries.length > 0 && !selectedDlvId) {
+      setSelectedDlvId(deliveries[0].id);
+    }
+  }, [deliveries]);
 
   // Audit state
   const [auditWhId, setAuditWhId] = useState(warehouses[0]?.id || '');
@@ -80,9 +101,24 @@ export default function Warehouses({
       notes: transNotes
     });
 
+    if (enableGPS && onAddDelivery) {
+      await onAddDelivery({
+        driverName,
+        driverPhone,
+        vehiclePlate,
+        vehicleType,
+        fromWarehouseId: fromWhId,
+        toWarehouseId: toWhId,
+        productId: transProdId,
+        quantity: transQty,
+        notes: transNotes
+      });
+    }
+
     setTransNotes('');
     setTransQty(1);
-    alert('Điều chuyển hàng hóa liên tỉnh thành công!');
+    onRefresh();
+    alert('Điều chuyển hàng hóa liên tỉnh và khởi tạo đơn giám sát GPS thành công!');
   };
 
   const initAuditMockLines = (whId: string) => {
@@ -265,95 +301,466 @@ export default function Warehouses({
       )}
 
       {/* SUBTAB 2: Stock transfer management */}
-      {activeSubTab === 'transfer' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
-          <div className="max-w-xl space-y-4">
-            <div>
-              <h3 className="font-bold text-slate-950 dark:text-white text-sm">Vận chuyển chuyển kho vật tư liên tỉnh</h3>
-              <p className="text-slate-400 text-xs">Phân cấp bốc dỡ hàng từ chi nhánh xuất bến đến bãi bến cảng phụ thuộc nội bộ.</p>
+      {activeSubTab === 'transfer' && (() => {
+        const DRIVER_TEMPLATES = [
+          { name: 'Nguyễn Văn Tải', phone: '0912.445.667', plate: '29C-884.22', type: 'Suzuki Pro 750kg' },
+          { name: 'Phạm Quốc Xe', phone: '0978.555.222', plate: '51D-993.45', type: 'Xe tải Hino 5 Tấn' },
+          { name: 'Trần Bình An', phone: '0933.111.999', plate: '30F-122.34', type: 'Thaco Towner 990kg' }
+        ];
+
+        const ROAD_POINTS = [
+          { id: 'wh-1', x: 70, y: 100, label: 'Kho Hà Nội' },
+          { id: 'wh-2', x: 190, y: 70, label: 'Lộ trình Hải Phòng' },
+          { id: 'wh-mid1', x: 310, y: 115, label: 'Trạm Tiếp Vận Vinh' },
+          { id: 'wh-mid2', x: 430, y: 95, label: 'Trạm Đèo Hải Vân' },
+          { id: 'wh-mid3', x: 540, y: 110, label: 'Trạm Nha Trang' },
+          { id: 'wh-3', x: 650, y: 120, label: 'Kho Sài Gòn' }
+        ];
+
+        const getWarehousePoint = (whId: string, isFrom: boolean) => {
+          if (whId === 'wh-1') return ROAD_POINTS[0];
+          if (whId === 'wh-2') return ROAD_POINTS[1];
+          if (whId === 'wh-3') return ROAD_POINTS[5];
+          return isFrom ? ROAD_POINTS[2] : ROAD_POINTS[4];
+        };
+
+        const handlePrefillDriver = (idxStr: string) => {
+          if (idxStr === '') return;
+          const selected = DRIVER_TEMPLATES[Number(idxStr)];
+          setDriverName(selected.name);
+          setDriverPhone(selected.phone);
+          setVehiclePlate(selected.plate);
+          setVehicleType(selected.type);
+        };
+
+        const activeDlv = deliveries.find(d => d.id === selectedDlvId) || deliveries[0];
+
+        // Interpolate truck position
+        let truckX = 360;
+        let truckY = 100;
+        let fromWhName = 'Kho Gửi';
+        let toWhName = 'Kho Nhận';
+
+        if (activeDlv) {
+          const startPt = getWarehousePoint(activeDlv.fromWarehouseId, true);
+          const endPt = getWarehousePoint(activeDlv.toWarehouseId, false);
+          fromWhName = warehouses.find(w => w.id === activeDlv.fromWarehouseId)?.name || 'Kho Gửi';
+          toWhName = warehouses.find(w => w.id === activeDlv.toWarehouseId)?.name || 'Kho Nhận';
+          const progressDec = (activeDlv.routeProgress || 0) / 100;
+          truckX = startPt.x + (endPt.x - startPt.x) * progressDec;
+          truckY = startPt.y + (endPt.y - startPt.y) * progressDec;
+        }
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* COLUMN 1: FORM (lg:col-span-4) */}
+            <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+              <div>
+                <span className="p-1 px-2.5 bg-blue-500/5 text-blue-600 rounded-lg text-[10px] font-extrabold uppercase tracking-widest block w-fit mb-1.5">Bộ phận điều độ bến bãi</span>
+                <h3 className="font-bold text-slate-950 dark:text-white text-sm flex items-center gap-2">
+                  <Send className="h-4 w-4 text-blue-600" /> Vận chuyển & Điều phối vật tư
+                </h3>
+                <p className="text-slate-400 text-[11px] mt-1">Phân cấp bốc dỡ hàng từ chi nhánh xuất bến đến bãi bến nội bộ kèm giám sát GPS thời gian thực.</p>
+              </div>
+
+              <form onSubmit={handleTransfer} className="space-y-4 pt-1">
+                {transferError && (
+                  <div className="p-3 bg-red-500/5 text-red-650 rounded-xl text-xs border border-red-500/10 font-bold">
+                    {transferError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Kho gửi đi</label>
+                    <select
+                      value={fromWhId}
+                      onChange={(e) => setFromWhId(e.target.value)}
+                      className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border border-slate-200 dark:border-slate-800 focus:outline-none"
+                    >
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Kho tiếp nhận</label>
+                    <select
+                      value={toWhId}
+                      onChange={(e) => setToWhId(e.target.value)}
+                      className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border border-slate-200 dark:border-slate-800 focus:outline-none"
+                    >
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Sản phẩm điều phối</label>
+                  <select
+                    value={transProdId}
+                    onChange={(e) => setTransProdId(e.target.value)}
+                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border border-slate-200 dark:border-slate-800 focus:outline-none"
+                  >
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} (Tồn kho: {p.stock})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Khối lượng (Số lượng)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={transQty}
+                      onChange={(e) => setTransQty(Number(e.target.value))}
+                      className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border border-slate-200 dark:border-slate-800 focus:outline-none font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Lý do điều chuyển</label>
+                    <input
+                      type="text"
+                      placeholder="Ghi chú điều chuyển"
+                      value={transNotes}
+                      onChange={(e) => setTransNotes(e.target.value)}
+                      className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border border-slate-200 dark:border-slate-800 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* INTERACTIVE TRACKING OPTION */}
+                <div className="border-t border-slate-100 dark:border-slate-850 pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input 
+                        type="checkbox" 
+                        checked={enableGPS}
+                        onChange={(e) => setEnableGPS(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Giao hàng kèm Giám sát GPS hạm đội</span>
+                    </label>
+                  </div>
+
+                  {enableGPS && (
+                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200/50 space-y-3">
+                      <div>
+                        <label className="text-[10px] text-slate-450 font-bold uppercase">Mẫu tài xế & Xe</label>
+                        <select
+                          onChange={(e) => handlePrefillDriver(e.target.value)}
+                          defaultValue=""
+                          className="w-full mt-1 p-1 px-2 bg-white dark:bg-slate-900 text-slate-850 dark:text-white text-[11px] rounded border border-slate-200 dark:border-slate-850 focus:outline-none"
+                        >
+                          <option value="">-- Chọn tài xế để điền nhanh --</option>
+                          {DRIVER_TEMPLATES.map((dr, idx) => (
+                            <option key={idx} value={idx}>{dr.name} - BKS: {dr.plate}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] text-slate-450 font-bold uppercase">Tài xế</label>
+                          <input 
+                            type="text"
+                            required={enableGPS}
+                            value={driverName}
+                            onChange={(e) => setDriverName(e.target.value)}
+                            className="w-full mt-1 p-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] rounded border border-slate-200 dark:border-slate-850 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-450 font-bold uppercase">SĐT tài xế</label>
+                          <input 
+                            type="text"
+                            required={enableGPS}
+                            value={driverPhone}
+                            onChange={(e) => setDriverPhone(e.target.value)}
+                            className="w-full mt-1 p-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] rounded border border-slate-200 dark:border-slate-850 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] text-slate-450 font-bold uppercase">Biển số xe</label>
+                          <input 
+                            type="text"
+                            required={enableGPS}
+                            placeholder="Chữ/Số kiểm soát"
+                            value={vehiclePlate}
+                            onChange={(e) => setVehiclePlate(e.target.value)}
+                            className="w-full mt-1 p-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] rounded border border-slate-200 dark:border-slate-850 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-slate-450 font-bold uppercase">Loại xe vận tải</label>
+                          <input 
+                            type="text"
+                            required={enableGPS}
+                            value={vehicleType}
+                            onChange={(e) => setVehicleType(e.target.value)}
+                            className="w-full mt-1 p-1 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-[11px] rounded border border-slate-200 dark:border-slate-850 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-750 text-white font-bold text-xs rounded-xl shadow cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <Truck className="h-4 w-4" /> Xác nhận bốc hàng & Khởi động GPS
+                </button>
+              </form>
             </div>
 
-            <form onSubmit={handleTransfer} className="space-y-4 pt-1">
-              {transferError && (
-                <div className="p-3.5 bg-red-500/5 text-red-650 rounded-xl text-xs border border-red-500/10 font-bold">
-                  {transferError}
+            {/* COLUMN 2: ACTIVE REPAIR AND GPS MONITORING (lg:col-span-8) */}
+            <div className="lg:col-span-8 space-y-6">
+              
+              {/* FLEET LIST */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Danh sách đơn hàng vận tải nội điện</h4>
+                    <p className="text-[11px] text-slate-400">Chọn hoặc nhấp để bật định vị lộ trình vệ tinh GPS trực tiếp.</p>
+                  </div>
+                  <button 
+                    onClick={onRefresh}
+                    className="p-1 px-2 text-[10px] font-bold border rounded bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 hover:bg-slate-100 flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Đồng bộ
+                  </button>
+                </div>
+
+                {deliveries.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-xs">
+                    <Compass className="h-8 w-8 mx-auto text-slate-300 mb-2 animate-spin-slow" />
+                    Chưa có đơn hàng điều chuyển GPS nào vận hành.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[180px] overflow-y-auto">
+                    {deliveries.map(dlv => {
+                      const fromName = warehouses.find(w => w.id === dlv.fromWarehouseId)?.name || 'Hà Nội';
+                      const toName = warehouses.find(w => w.id === dlv.toWarehouseId)?.name || 'TP. HCM';
+                      const prodName = products.find(p => p.id === dlv.productId)?.name || 'Thiết bị';
+                      const isSelected = selectedDlvId === dlv.id;
+
+                      return (
+                        <div 
+                          key={dlv.id} 
+                          onClick={() => setSelectedDlvId(dlv.id)}
+                          className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex flex-col justify-between ${isSelected ? 'border-blue-500 bg-blue-50/5 dark:bg-blue-500/5 ring-1 ring-blue-500' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-950 bg-white dark:bg-slate-900'}`}
+                        >
+                          <div className="flex items-start justify-between gap-1.5">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-blue-605 dark:text-blue-400 font-extrabold">{dlv.code}</span>
+                                <span className="text-[10px] font-mono text-slate-400">({formatDate(dlv.date)})</span>
+                              </div>
+                              <span className="text-slate-400 text-[10px] block mt-0.5 truncate max-w-[180px]">{prodName} x{dlv.quantity}</span>
+                            </div>
+
+                            <span className={`p-1 px-1.5 rounded text-[9px] font-bold ${dlv.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : dlv.status === 'SHIPPING' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : dlv.status === 'DELAYED' ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                              {dlv.status === 'COMPLETED' ? 'Đã hoàn tất' : dlv.status === 'SHIPPING' ? 'Đang giao' : dlv.status === 'DELAYED' ? 'Tạm dừng xe' : 'Chờ bốc'}
+                            </span>
+                          </div>
+
+                          <div className="my-1.5 flex items-center gap-1.5 font-bold text-[10px]">
+                            <span className="text-slate-500 block truncate max-w-[90px]">{fromName}</span>
+                            <ChevronRight className="h-3 w-3 text-slate-400" />
+                            <span className="text-slate-800 dark:text-slate-200 block truncate max-w-[90px]">{toName}</span>
+                          </div>
+
+                          <div className="border-t border-slate-100 dark:border-slate-850 pt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+                            <span className="block truncate">Tài xế: <strong className="text-slate-700 dark:text-slate-300">{dlv.driverName}</strong></span>
+                            <span className="font-mono text-blue-500 font-bold">{dlv.routeProgress}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* LIVE MAP TRACKER AND GPS ACTIONS */}
+              {activeDlv && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-[9px] font-extrabold flex items-center gap-1">
+                          <Activity className="h-3 w-3 animate-pulse" /> GPS TRỰC TUYẾN
+                        </span>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                          Bản đồ lộ trình đơn xe: <span className="text-blue-500 font-mono font-extrabold">{activeDlv.code}</span>
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">Giám sát xe khách hành trình từ {fromWhName} đến {toWhName}.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        onClick={async () => {
+                          if (onUpdateDelivery) {
+                            await onUpdateDelivery(activeDlv.id, { 
+                              routeProgress: 100, 
+                              status: 'COMPLETED',
+                              currentLocationName: 'Đã cập bến nhận hàng an toàn'
+                            });
+                            onRefresh();
+                          }
+                        }}
+                        className="p-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold"
+                      >
+                        Cập bến (100%)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* VISUAL COMPONENT */}
+                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3.5">
+                    
+                    {/* Live indicators */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-mono">Ý chí tài xế</span>
+                        <strong className="text-slate-800 dark:text-slate-200 mt-0.5 block flex items-center gap-1 font-bold">
+                          <User className="h-3.5 w-3.5 text-blue-500" /> {activeDlv.driverName}
+                        </strong>
+                        <span className="text-[10px] text-slate-400 block font-mono">{activeDlv.driverPhone}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-mono">Kiểm soát xe</span>
+                        <strong className="text-slate-800 dark:text-slate-200 mt-0.5 block flex items-center gap-1 font-bold">
+                          <Truck className="h-3.5 w-3.5 text-amber-500" /> {activeDlv.vehiclePlate}
+                        </strong>
+                        <span className="text-[10px] text-slate-400 block truncate">{activeDlv.vehicleType}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-mono">Định vị GPS</span>
+                        <strong className="text-slate-800 dark:text-slate-200 mt-0.5 block text-[11px] truncate font-bold font-mono text-red-500">
+                          <MapPin className="h-3 w-3 inline mr-0.5" /> 
+                          {activeDlv.latitude.toFixed(4)}, {activeDlv.longitude.toFixed(4)}
+                        </strong>
+                        <span className="text-[10px] text-slate-405 block truncate max-w-[140px]">{activeDlv.currentLocationName || 'Đang cập lộ trình'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 block uppercase font-mono">Hành trình tuyến đầu</span>
+                        <strong className="text-slate-800 dark:text-slate-200 mt-0.5 block text-xs font-bold font-mono text-blue-500 flex items-center justify-between">
+                          <span>{activeDlv.routeProgress}% Hoàn tất</span>
+                          <span className={`h-1.5 w-1.5 rounded-full ${activeDlv.gpsStatus === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                        </strong>
+                        <span className="text-[10px] text-slate-400 block font-mono">Tín hiệu: {activeDlv.gpsStatus === 'ACTIVE' ? 'KẾT NỐI MẠNH' : 'NGOẠI TUYẾN'}</span>
+                      </div>
+                    </div>
+
+                    {/* LIVE MAP TRACKER */}
+                    <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 relative overflow-hidden flex flex-col justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 align-middle">
+                          <Radio className="h-3.5 w-3.5 text-emerald-450 animate-pulse" />
+                          <span className="text-[10px] font-mono tracking-wider text-emerald-400 font-bold uppercase select-none">
+                            {activeDlv.gpsStatus === 'ACTIVE' ? 'ĐÀI KIỂM SOÁT VỆ TINH LỘ TRÌNH QUỐC LỘ Bắc - Nam' : 'HỆ THỐNG MẤT TỚI VỆ TINH TRUYỀN PHÁT'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="relative w-full mb-2 overflow-hidden">
+                        <GoogleDeliveryMap 
+                          activeDlv={activeDlv} 
+                          warehouses={warehouses} 
+                          onCoordUpdate={async (lat, lng) => {
+                            if (onUpdateDelivery && (Math.abs(activeDlv.latitude - lat) > 0.005 || Math.abs(activeDlv.longitude - lng) > 0.005)) {
+                              await onUpdateDelivery(activeDlv.id, { latitude: lat, longitude: lng });
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {/* Progress slider bar control inside real time */}
+                      <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="flex items-center gap-1.5">
+                            <Navigation className="h-3.5 w-3.5 text-blue-500 animate-spin-slow" />
+                            <span>Mô phỏng di chuyển hành trình xe (Kéo thanh trượt):</span>
+                          </span>
+                          <span className="font-mono text-blue-500 font-bold">{activeDlv.routeProgress}%</span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                          <input 
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={activeDlv.routeProgress}
+                            onChange={async (e) => {
+                              const prog = Number(e.target.value);
+                              let dlvStatus: 'PENDING' | 'SHIPPING' | 'COMPLETED' | 'DELAYED' = 'SHIPPING';
+                              if (prog === 0) dlvStatus = 'PENDING';
+                              else if (prog === 100) dlvStatus = 'COMPLETED';
+                              
+                              if (onUpdateDelivery) {
+                                await onUpdateDelivery(activeDlv.id, { 
+                                  routeProgress: prog,
+                                  status: dlvStatus,
+                                  currentLocationName: prog === 100 ? 'Đã bốc dỡ bàn giao thành công' : prog === 0 ? 'Tại bãi bốc nguồn' : `QL1A, phân đoạn tiến trình ${prog}%`
+                                });
+                                onRefresh();
+                              }
+                            }}
+                            className="w-full sm:flex-1 accent-blue-600 cursor-pointer"
+                          />
+
+                          <div className="flex gap-1.5 w-full sm:w-auto justify-end">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (onUpdateDelivery) {
+                                  await onUpdateDelivery(activeDlv.id, { gpsStatus: activeDlv.gpsStatus === 'ACTIVE' ? 'SIGNAL_LOST' : 'ACTIVE' });
+                                  onRefresh();
+                                }
+                              }}
+                              className={`p-1 px-2 rounded text-[10px] font-bold ${activeDlv.gpsStatus === 'ACTIVE' ? 'bg-amber-500/15 text-amber-500 border border-amber-500/20' : 'bg-green-500/15 text-green-500 border border-green-500/20'}`}
+                            >
+                              {activeDlv.gpsStatus === 'ACTIVE' ? 'Mất sóng GPS' : 'Cấp lại GPS'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (onUpdateDelivery) {
+                                  await onUpdateDelivery(activeDlv.id, { status: activeDlv.status === 'DELAYED' ? 'SHIPPING' : 'DELAYED' });
+                                  onRefresh();
+                                }
+                              }}
+                              className={`p-1 px-2 rounded text-[10px] font-bold ${activeDlv.status === 'DELAYED' ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/15 text-red-500 border border-red-500/20'}`}
+                            >
+                              {activeDlv.status === 'DELAYED' ? 'Khắc phục xe' : 'Hỏng xe/Sự cố'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-505 font-bold uppercase">Kho gửi đi</label>
-                  <select
-                    value={fromWhId}
-                    onChange={(e) => setFromWhId(e.target.value)}
-                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border focus:outline-none"
-                  >
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-505 font-bold uppercase">Kho tiếp nhận</label>
-                  <select
-                    value={toWhId}
-                    onChange={(e) => setToWhId(e.target.value)}
-                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border focus:outline-none"
-                  >
-                    {warehouses.map(w => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            </div>
 
-              <div>
-                <label className="text-xs text-slate-505 font-bold uppercase">Sản phẩm điều phối</label>
-                <select
-                  value={transProdId}
-                  onChange={(e) => setTransProdId(e.target.value)}
-                  className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border focus:outline-none"
-                >
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} (Lượng sẵn có: {p.stock})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-505 font-bold uppercase">Khối lượng dịch tinh (Số lượng)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={transQty}
-                    onChange={(e) => setTransQty(Number(e.target.value))}
-                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-505 font-bold uppercase">Lý do vận hành</label>
-                  <input
-                    type="text"
-                    placeholder="Mẫu: Bổ khuyết bão lụt, hỗ trợ..."
-                    value={transNotes}
-                    onChange={(e) => setTransNotes(e.target.value)}
-                    className="w-full mt-1.5 p-2 px-3 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-xs rounded-lg border focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-750 text-white font-bold text-xs rounded-xl shadow cursor-pointer text-center"
-              >
-                Xác nhận dịch kho nạp xe
-              </button>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* SUBTAB 3: Stocktake physical audit balance */}
       {activeSubTab === 'audit' && (

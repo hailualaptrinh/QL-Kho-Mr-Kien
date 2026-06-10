@@ -359,6 +359,7 @@ export default function App() {
   const [imports, setImports] = useState<any[]>([]);
   const [exports, setExports] = useState<any[]>([]);
   const [mutations, setMutations] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
   const [stocktakes, setStocktakes] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -499,10 +500,10 @@ export default function App() {
         chartData: []
       };
 
-      // Parallelize fetches to keep responses extremely snappy
+       // Parallelize fetches to keep responses extremely snappy
       const [
         statsRes, prodRes, catRes, supRes, cusRes, 
-        empRes, impRes, expRes, mutRes, stRes, logRes, notifRes, whRes, usersRes, meRes
+        empRes, impRes, expRes, mutRes, delivRes, stRes, logRes, notifRes, whRes, usersRes, meRes
       ] = await Promise.all([
         fetchSafeJSON('/api/reports/dashboard-stats', defaultStats),
         fetchSafeJSON('/api/products', []),
@@ -513,6 +514,7 @@ export default function App() {
         fetchSafeJSON('/api/imports', []),
         fetchSafeJSON('/api/exports', []),
         fetchSafeJSON('/api/mutations', []),
+        fetchSafeJSON('/api/deliveries', []),
         fetchSafeJSON('/api/stocktakes', []),
         fetchSafeJSON('/api/logs', []),
         fetchSafeJSON('/api/notifications', []),
@@ -530,6 +532,7 @@ export default function App() {
       setImports(impRes);
       setExports(expRes);
       setMutations(mutRes);
+      setDeliveries(delivRes);
       setStocktakes(stRes);
       setLogs(logRes);
       setNotifications(notifRes);
@@ -761,6 +764,8 @@ export default function App() {
   
   const handleAddWarehouse = (payload: any) => makePostCall('/api/warehouses', payload);
   const handleTransferStock = (payload: any) => makePostCall('/api/warehouses/transfer', payload);
+  const handleAddDelivery = (payload: any) => makePostCall('/api/deliveries', payload);
+  const handleUpdateDelivery = (id: string, payload: any) => makePutCall(`/api/deliveries/${id}`, payload);
   const handleAuditStock = (payload: any) => makePostCall('/api/warehouses/stocktake', payload);
 
   const handleAddCustomer = (payload: any) => makePostCall('/api/customers', payload);
@@ -1295,10 +1300,13 @@ export default function App() {
               warehouses={warehouses}
               products={products}
               mutations={mutations}
+              deliveries={deliveries}
               stocktakes={stocktakes}
               user={user}
               onAddWarehouse={handleAddWarehouse}
               onTransferStock={handleTransferStock}
+              onAddDelivery={handleAddDelivery}
+              onUpdateDelivery={handleUpdateDelivery}
               onAuditStock={handleAuditStock}
               onRefresh={fetchAllStates}
             />

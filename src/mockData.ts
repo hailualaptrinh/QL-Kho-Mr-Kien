@@ -419,3 +419,60 @@ export const INITIAL_MUTATIONS: StockMove[] = [
     notes: 'Điều động xuất kho bổ sung Router ASUS phòng hờ bão tại khu vực Cảng Hải Phòng.'
   }
 ];
+
+export const INITIAL_DELIVERIES = [
+  {
+    id: 'dlv-1',
+    code: 'VC-2026-001',
+    driverName: 'Nguyễn Văn Tải',
+    driverPhone: '0912.445.667',
+    vehiclePlate: '29C-884.22',
+    vehicleType: 'Xe tải Suzuki Pro 750kg',
+    fromWarehouseId: 'wh-1',
+    toWarehouseId: 'wh-3',
+    productId: 'prod-1',
+    quantity: 10,
+    notes: 'Vận chuyển hàng công nghệ cao, lót chống sốc cẩn thận.',
+    status: 'SHIPPING',
+    gpsStatus: 'ACTIVE',
+    latitude: 16.0544,
+    longitude: 108.2022,
+    routeProgress: 55,
+    routeCoordinates: [
+      { lat: 21.0285, lng: 105.8542 },
+      { lat: 18.6734, lng: 105.6811 },
+      { lat: 16.4637, lng: 107.5908 },
+      { lat: 16.0544, lng: 108.2022 },
+      { lat: 12.2451, lng: 109.1943 },
+      { lat: 10.8231, lng: 106.6297 }
+    ],
+    currentLocationName: 'QL1A, Liên Chiểu, Đà Nẵng',
+    date: '2026-06-08T08:30:00Z'
+  },
+  {
+    id: 'dlv-2',
+    code: 'VC-2026-002',
+    driverName: 'Phạm Quốc Xe',
+    driverPhone: '0978.555.222',
+    vehiclePlate: '51D-993.45',
+    vehicleType: 'Xe tải Hino 5 Tấn',
+    fromWarehouseId: 'wh-3',
+    toWarehouseId: 'wh-1',
+    productId: 'prod-4',
+    quantity: 25,
+    notes: 'Hàng xuất trả bảo hành kiểm toán định kỳ từ miền Nam.',
+    status: 'PENDING',
+    gpsStatus: 'INACTIVE',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    routeProgress: 0,
+    routeCoordinates: [
+      { lat: 10.8231, lng: 106.6297 },
+      { lat: 11.9404, lng: 109.2198 },
+      { lat: 16.0544, lng: 108.2022 },
+      { lat: 21.0285, lng: 105.8542 }
+    ],
+    currentLocationName: 'Chi nhánh Quận 9, TP. HCM (Chuẩn bị bốc dỡ)',
+    date: '2026-06-09T10:00:00Z'
+  }
+];

@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { getDb, saveDatabase, logActivity, addNotification } from '../db';
 import { authMiddleware, roleMiddleware, checkPermission, AuthenticatedRequest, getUserPermissions } from '../middleware/auth';
 import { signJWT } from '../../src/utils';
-import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey, ChatMessage } from '../../src/types';
+import { Product, ImportOrder, ExportOrder, Stocktake, Customer, Supplier, Employee, Warehouse, StockMove, ApiKey, ChatMessage, DeliveryOrder } from '../../src/types';
 import { sendLowStockAlertEmail, sendTestEmailToRecipient } from '../services/email';
 
 const router = Router();
@@ -627,6 +627,99 @@ router.post('/warehouses/transfer', authMiddleware, checkPermission('add_imports
 
   saveDatabase();
   res.status(201).json(newMove);
+});
+
+router.get('/deliveries', authMiddleware, (req, res) => {
+  const db = getDb();
+  db.deliveries = db.deliveries || [];
+  res.json(db.deliveries);
+});
+
+router.post('/deliveries', authMiddleware, checkPermission('add_imports'), (req: AuthenticatedRequest, res) => {
+  const { 
+    driverName, driverPhone, vehiclePlate, vehicleType, 
+    fromWarehouseId, toWarehouseId, productId, quantity, notes 
+  } = req.body;
+  const db = getDb();
+  db.deliveries = db.deliveries || [];
+
+  const product = db.products.find(p => p.id === productId);
+  const fromWh = db.warehouses.find(w => w.id === fromWarehouseId);
+  const toWh = db.warehouses.find(w => w.id === toWarehouseId);
+
+  if (!product || !fromWh || !toWh || !quantity || quantity <= 0) {
+    res.status(400).json({ error: 'Thông tin hàng hóa hoặc kho bãi không hợp lệ!' });
+    return;
+  }
+
+  const routeCoordinates = [
+    { lat: 21.0285, lng: 105.8542 },
+    { lat: 18.6734, lng: 105.6811 },
+    { lat: 16.0544, lng: 108.2022 },
+    { lat: 12.2451, lng: 109.1943 },
+    { lat: 10.8231, lng: 106.6297 }
+  ];
+
+  const newDelivery: DeliveryOrder = {
+    id: `dlv-${Date.now()}`,
+    code: `VC-${new Date().getFullYear()}-${String(db.deliveries.length + 1).padStart(3, '0')}`,
+    driverName: driverName || 'Tài xế Dự phòng',
+    driverPhone: driverPhone || '0901.234.567',
+    vehiclePlate: vehiclePlate || '29C-702.45',
+    vehicleType: vehicleType || 'Xe tải Van 1.25 Tấn',
+    fromWarehouseId,
+    toWarehouseId,
+    productId,
+    quantity: Number(quantity),
+    notes: notes || '',
+    status: 'PENDING',
+    gpsStatus: 'ACTIVE',
+    latitude: routeCoordinates[0].lat,
+    longitude: routeCoordinates[0].lng,
+    routeProgress: 0,
+    routeCoordinates,
+    currentLocationName: `${fromWh.name} (Địa chỉ khởi hành)`,
+    date: new Date().toISOString()
+  };
+
+  db.deliveries.unshift(newDelivery);
+  logActivity(req.userId || 'system', 'TẠO VẬN CHUYỂN', `Tạo đơn vận chuyển ${newDelivery.code} - Tài xế: ${newDelivery.driverName}`);
+  saveDatabase();
+  res.status(201).json(newDelivery);
+});
+
+router.put('/deliveries/:id', authMiddleware, (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  const { status, gpsStatus, routeProgress, currentLocationName, latitude, longitude } = req.body;
+  const db = getDb();
+  db.deliveries = db.deliveries || [];
+
+  const dlv = db.deliveries.find(d => d.id === id);
+  if (!dlv) {
+    res.status(404).json({ error: 'Không tìm thấy đơn vận chuyển này.' });
+    return;
+  }
+
+  if (status !== undefined) dlv.status = status;
+  if (gpsStatus !== undefined) dlv.gpsStatus = gpsStatus;
+  if (routeProgress !== undefined) {
+    dlv.routeProgress = Number(routeProgress);
+    if (dlv.routeCoordinates && dlv.routeCoordinates.length > 0) {
+      const coordIndex = Math.min(
+        Math.floor((dlv.routeProgress / 100) * dlv.routeCoordinates.length),
+        dlv.routeCoordinates.length - 1
+      );
+      dlv.latitude = dlv.routeCoordinates[coordIndex].lat;
+      dlv.longitude = dlv.routeCoordinates[coordIndex].lng;
+    }
+  }
+  if (currentLocationName !== undefined) dlv.currentLocationName = currentLocationName;
+  if (latitude !== undefined) dlv.latitude = Number(latitude);
+  if (longitude !== undefined) dlv.longitude = Number(longitude);
+
+  logActivity(req.userId || 'system', 'CẬP NHẬT VẬN CHUYỂN', `Cập nhật đơn ${dlv.code}: Trạng thái ${dlv.status}, Tiến độ ${dlv.routeProgress}%`);
+  saveDatabase();
+  res.json(dlv);
 });
 
 router.get('/stocktakes', authMiddleware, (req, res) => {

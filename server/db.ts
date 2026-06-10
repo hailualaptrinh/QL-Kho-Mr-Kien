@@ -10,11 +10,11 @@ import { MongoClient } from 'mongodb';
 import { 
   INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_SUPPLIERS, 
   INITIAL_CUSTOMERS, INITIAL_WAREHOUSES, INITIAL_EMPLOYEES, INITIAL_NOTIFICATIONS, 
-  INITIAL_IMPORTS, INITIAL_EXPORTS, INITIAL_STOCKTAKES, INITIAL_MUTATIONS 
+  INITIAL_IMPORTS, INITIAL_EXPORTS, INITIAL_STOCKTAKES, INITIAL_MUTATIONS, INITIAL_DELIVERIES 
 } from '../src/mockData';
 import { 
   User, Category, Product, Supplier, Customer, Warehouse, 
-  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey, PhotoReport, EmailSettings, ChatMessage 
+  ImportOrder, ExportOrder, Employee, Stocktake, AppNotification, StockMove, AuditLog, ApiKey, PhotoReport, EmailSettings, ChatMessage, DeliveryOrder 
 } from '../src/types';
 
 // Support custom environment paths or Render's persistent disk mounts dynamically
@@ -56,6 +56,7 @@ export interface DatabaseSchema {
   photoReports: PhotoReport[];
   emailSettings?: EmailSettings;
   messages?: ChatMessage[];
+  deliveries?: DeliveryOrder[];
 }
 
 const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
@@ -86,7 +87,8 @@ let dbState: DatabaseSchema = {
   logs: [],
   apiKeys: [],
   photoReports: [],
-  messages: []
+  messages: [],
+  deliveries: []
 };
 
 // Simple helper to hash strings using node:crypto (equivalent to bcrypt simulation)
@@ -166,6 +168,7 @@ export async function initDatabase() {
           if (!dbState.apiKeys) dbState.apiKeys = [];
           if (!dbState.photoReports) dbState.photoReports = [];
           if (!dbState.messages) dbState.messages = [];
+          if (!dbState.deliveries) dbState.deliveries = [...INITIAL_DELIVERIES] as any;
           if (!dbState.emailSettings) dbState.emailSettings = { ...DEFAULT_EMAIL_SETTINGS };
 
           console.log('====== MONGO DB CONFIG ======');
@@ -201,6 +204,9 @@ export async function initDatabase() {
       }
       if (!dbState.messages) {
         dbState.messages = [];
+      }
+      if (!dbState.deliveries) {
+        dbState.deliveries = [...INITIAL_DELIVERIES] as any;
       }
       console.log('Database loaded successfully from local file:', DB_FILE);
     } catch (e) {
@@ -256,6 +262,7 @@ function seedDatabaseInternal() {
         }
       }
     ],
+    deliveries: [...INITIAL_DELIVERIES] as any,
     logs: [
       {
         id: 'log-1',
